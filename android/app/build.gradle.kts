@@ -93,9 +93,6 @@ dependencies {
     // Image loading (Coil Compose)
     implementation("io.coil-kt:coil-compose:2.6.0")
 
-    // DataStore Preferences for settings & token storage
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
-
     // Testing
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
