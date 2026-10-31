@@ -128,16 +128,15 @@ jobs:
         with:
           workspaces: desktop/src-tauri -> target
 
-      - name: Build Desktop Frontend
+      - name: Build Desktop Application
+        shell: bash
         run: |
-          cd desktop
-          npm install
-          npm run build
+          npm --prefix desktop install
+          npm --prefix desktop run build
 
       - name: Build Windows Tauri Bundle (.exe)
-        run: |
-          cd desktop
-          npx tauri build --ignore-version-mismatches
+        shell: bash
+        run: npm --prefix desktop run tauri -- build --ignore-version-mismatches
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_CLI_NO_VERSION_CHECK: "true"
