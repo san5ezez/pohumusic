@@ -53,12 +53,17 @@ export const DesktopFullScreenPlayer: React.FC<DesktopFullScreenPlayerProps> = (
   onClose,
 }) => {
   const [isDragging, setIsDragging] = React.useState(false);
-  const [dragValue, setDragValue] = React.useState(0);
+  const [dragValue, setDragValue] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    setIsDragging(false);
+    setDragValue(null);
+  }, [track?.id]);
 
   const totalDuration =
     durationMs > 0 ? durationMs : (track.durationSeconds || 180) * 1000;
 
-  const activePosition = isDragging ? dragValue : positionMs;
+  const activePosition = isDragging && dragValue !== null ? dragValue : positionMs;
   const currentSec = Math.floor(activePosition / 1000);
   const totalSec = Math.floor(totalDuration / 1000);
 
@@ -120,7 +125,7 @@ export const DesktopFullScreenPlayer: React.FC<DesktopFullScreenPlayerProps> = (
             type="range"
             min={0}
             max={totalDuration}
-            value={activePosition}
+            value={Math.min(activePosition, totalDuration)}
             onMouseDown={() => {
               setIsDragging(true);
               setDragValue(positionMs);
@@ -134,12 +139,17 @@ export const DesktopFullScreenPlayer: React.FC<DesktopFullScreenPlayerProps> = (
               setDragValue(val);
             }}
             onMouseUp={(e) => {
+              const val = Number((e.target as HTMLInputElement).value);
               setIsDragging(false);
-              onSeek(Number((e.target as HTMLInputElement).value));
+              setDragValue(null);
+              onSeek(val);
             }}
             onTouchEnd={() => {
               setIsDragging(false);
-              onSeek(dragValue);
+              if (dragValue !== null) {
+                onSeek(dragValue);
+              }
+              setDragValue(null);
             }}
             className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer"
             style={{ accentColor }}

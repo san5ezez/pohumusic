@@ -1105,7 +1105,7 @@ async function processOAuthExchange(
     userAgent: c.req.header('User-Agent') || 'OAuth Callback',
   });
 
-  return {
+  const result = {
     provider,
     user: {
       id: targetUser.id,

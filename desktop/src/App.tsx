@@ -260,6 +260,7 @@ export function App() {
             if (autoPlay) {
               setCurrentTrack(waveList[0]);
               setPositionMs(0);
+              setSeekPositionMs(null);
               setIsPlaying(true);
             }
           }
@@ -346,6 +347,13 @@ export function App() {
   const currentQueue =
     activeTab === 'search' && searchResults.length > 0 ? searchResults : tracks;
 
+  const handleSelectTrack = useCallback((track: Track) => {
+    setCurrentTrack(track);
+    setPositionMs(0);
+    setSeekPositionMs(null);
+    setIsPlaying(true);
+  }, []);
+
   const handleSeek = (newPos: number) => {
     setPositionMs(newPos);
     setSeekPositionMs(newPos);
@@ -355,10 +363,7 @@ export function App() {
     if (!currentTrack || currentQueue.length === 0) return;
     const idx = currentQueue.findIndex((t) => t.id === currentTrack.id);
     if (idx !== -1 && idx + 1 < currentQueue.length) {
-      setCurrentTrack(currentQueue[idx + 1]);
-      setPositionMs(0);
-      setSeekPositionMs(null);
-      setIsPlaying(true);
+      handleSelectTrack(currentQueue[idx + 1]);
     }
   };
 
@@ -366,10 +371,7 @@ export function App() {
     if (!currentTrack || currentQueue.length === 0) return;
     const idx = currentQueue.findIndex((t) => t.id === currentTrack.id);
     if (idx > 0) {
-      setCurrentTrack(currentQueue[idx - 1]);
-      setPositionMs(0);
-      setSeekPositionMs(null);
-      setIsPlaying(true);
+      handleSelectTrack(currentQueue[idx - 1]);
     }
   };
 
@@ -726,11 +728,7 @@ export function App() {
                     return (
                       <div
                         key={t.id}
-                        onClick={() => {
-                          setCurrentTrack(t);
-                          setPositionMs(0);
-                          setIsPlaying(true);
-                        }}
+                        onClick={() => handleSelectTrack(t)}
                         className={`group p-3 rounded-xl cursor-pointer transition-all border ${
                           isCurrent
                             ? 'bg-slate-800/80 border-slate-700 shadow-lg'
@@ -834,11 +832,7 @@ export function App() {
                   return (
                     <div
                       key={t.id}
-                      onClick={() => {
-                        setCurrentTrack(t);
-                        setPositionMs(0);
-                        setIsPlaying(true);
-                      }}
+                      onClick={() => handleSelectTrack(t)}
                       className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-colors ${
                         isCurrent
                           ? 'bg-slate-800/90 border-blue-500/50 shadow-md'
