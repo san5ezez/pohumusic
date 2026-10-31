@@ -166,14 +166,55 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const res = await fetch(`${API_BASE_URL}/auth/oauth/${provider}/start`);
       const data = await res.json();
       const authUrl = data.authUrl || data.authorizationUrl;
+      const state = data.state;
       if (!res.ok || !authUrl) {
         throw new Error(data.error?.message || `Не удалось инициировать вход через ${provider}`);
       }
-      // Open OAuth in default browser window
-      window.open(authUrl, '_blank', 'width=600,height=750');
+
+      // Open OAuth in user's default system browser
+      try {
+        if ((window as any).__TAURI__?.shell?.open) {
+          await (window as any).__TAURI__.shell.open(authUrl);
+        } else {
+          window.open(authUrl, '_blank', 'width=600,height=750');
+        }
+      } catch {
+        window.open(authUrl, '_blank', 'width=600,height=750');
+      }
+
+      // Start polling for OAuth completion via state
+      if (state) {
+        let attempts = 0;
+        const maxAttempts = 120; // 2.5 minutes
+        const pollInterval = setInterval(async () => {
+          attempts++;
+          if (attempts > maxAttempts) {
+            clearInterval(pollInterval);
+            setIsLoading(false);
+            return;
+          }
+
+          try {
+            const checkRes = await fetch(
+              `${API_BASE_URL}/auth/oauth/status?state=${encodeURIComponent(state)}`
+            );
+            if (checkRes.ok) {
+              const checkData = await checkRes.json();
+              if (checkData.status === 'authenticated' && checkData.tokens?.accessToken) {
+                clearInterval(pollInterval);
+                onAuthSuccess(
+                  checkData.user,
+                  checkData.tokens.accessToken,
+                  checkData.tokens.refreshToken
+                );
+                onClose();
+              }
+            }
+          } catch {}
+        }, 1200);
+      }
     } catch (err: any) {
       setError(err.message || `Ошибка авторизации через ${provider}`);
-    } finally {
       setIsLoading(false);
     }
   };

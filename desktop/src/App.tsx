@@ -7,6 +7,7 @@ import { HotkeyConfigModal } from './components/HotkeyConfigModal';
 import { SplashScreen } from './components/SplashScreen';
 import { AuthModal } from './components/AuthModal';
 import { TrackArtwork } from './components/TrackArtwork';
+import { AudioPlayer } from './components/AudioPlayer';
 import { API_BASE_URL } from './config/api';
 import type { Track, HotkeyConfig, Playlist, User } from './types';
 import {
@@ -869,6 +870,16 @@ export function App() {
         onToggleRepeat={() => setIsRepeat((r) => !r)}
         onToggleFavorite={() => currentTrack && toggleFavorite(currentTrack.id)}
         onOpenFullScreen={() => setIsFullScreen(true)}
+      />
+
+      {/* Audio Engine */}
+      <AudioPlayer
+        currentTrack={currentTrack}
+        isPlaying={isPlaying}
+        volume={volume}
+        positionMs={positionMs}
+        onPositionUpdate={setPositionMs}
+        onTrackEnded={handleNext}
       />
 
       {/* 4. FullScreen Modal Player */}

@@ -1116,7 +1116,43 @@ async function processOAuthExchange(
     },
     tokens,
   };
+
+  // Save for Desktop/Mobile client polling via state token
+  await c.env.KV.put(
+    `oauth:completed:${state}`,
+    JSON.stringify({
+      status: 'authenticated',
+      ...result,
+    }),
+    { expirationTtl: 600 }
+  );
+
+  return result;
 }
+
+// GET /api/v1/auth/oauth/status (Check completion of external browser OAuth)
+authRouter.get('/oauth/status', async (c) => {
+  const state = c.req.query('state') || '';
+  if (!state) {
+    return c.json({ status: 'missing_state' }, 400);
+  }
+
+  const completed = (await c.env.KV.get(`oauth:completed:${state}`, {
+    type: 'json',
+  })) as {
+    status: string;
+    user: any;
+    tokens: any;
+    provider: string;
+  } | null;
+
+  if (completed) {
+    await c.env.KV.delete(`oauth:completed:${state}`);
+    return c.json(completed);
+  }
+
+  return c.json({ status: 'pending' });
+});
 
 // GET /api/v1/auth/oauth/:provider/callback (Popup-based OAuth redirect handler)
 authRouter.get('/oauth/:provider/callback', async (c) => {
@@ -1159,10 +1195,10 @@ authRouter.get('/oauth/:provider/callback', async (c) => {
         <title>PohuMusic — Успешная авторизация</title>
       </head>
       <body style="background:#0b0f19;color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
-        <div style="text-align:center;padding:32px;background:#111827;border-radius:12px;border:1px solid #1e293b;max-width:400px;">
-          <div style="font-size:32px;margin-bottom:12px;">✅</div>
-          <h2 style="font-size:18px;margin:0 0 8px;color:#a5b4fc;">Авторизация успешна</h2>
-          <p style="font-size:14px;color:#94a3b8;margin:0 0 16px;">Вход выполнен через ${provider.toUpperCase()} (${result.user.displayName}). Окно сейчас закроется...</p>
+        <div style="text-align:center;padding:36px;background:#111827;border-radius:16px;border:1px solid #1e293b;max-width:440px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.5);">
+          <div style="font-size:36px;margin-bottom:12px;">✅</div>
+          <h2 style="font-size:20px;margin:0 0 8px;color:#34d399;">Авторизация успешна!</h2>
+          <p style="font-size:14px;color:#94a3b8;margin:0 0 16px;line-height:1.5;">Вы успешно вошли через ${provider.toUpperCase()} как <strong>${result.user.displayName}</strong>.<br><br>Можете закрыть эту вкладку и вернуться в приложение PohuMusic.</p>
         </div>
         <script>
           const payload = ${JSON.stringify({
