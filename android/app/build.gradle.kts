@@ -20,13 +20,13 @@ android {
             useSupportLibrary = true
         }
 
-        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://pohumusic-backend.4g-2551.workers.dev/api/v1\"")
+        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://pohumusic-backend.4g-2551.workers.dev/api/v1/\"")
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

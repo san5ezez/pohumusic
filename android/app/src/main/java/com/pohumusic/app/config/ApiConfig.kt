@@ -16,7 +16,10 @@ object ApiConfig {
     private var customBaseUrl: String? = null
 
     var baseUrl: String
-        get() = customBaseUrl ?: DEFAULT_API_BASE_URL
+        get() {
+            val url = customBaseUrl ?: DEFAULT_API_BASE_URL
+            return if (url.endsWith("/")) url else "$url/"
+        }
         set(value) {
             customBaseUrl = if (value.endsWith("/")) value else "$value/"
         }
