@@ -12,6 +12,7 @@ import { API_BASE_URL } from './config/api';
 import type { Track, HotkeyConfig, Playlist, User } from './types';
 import {
   Play,
+  Pause,
   WifiOff,
   Search as SearchIcon,
   Plus,
@@ -21,6 +22,8 @@ import {
   Shield,
   CheckCircle2,
   AlertCircle,
+  SlidersHorizontal,
+  Sparkles,
 } from 'lucide-react';
 
 function normalizeTrack(raw: any): Track {
@@ -41,10 +44,19 @@ function normalizeTrack(raw: any): Track {
   const externalUrl = raw.externalUrl || raw.permalinkUrl || '';
   const album = raw.album || raw.albumTitle || undefined;
 
+  const rawTitle = String(raw.title || 'Без названия');
+  const isRestricted =
+    raw.accessState === 'blocked' ||
+    raw.accessState === 'preview' ||
+    /Territory\s+Restricted|Go\+\s+Rights|Not\s+available|Region\s+Lock/i.test(rawTitle);
+  const cleanTitle = rawTitle
+    .replace(/\s*\((?:Territory\s+Restricted|Go\+\s+Rights\s+Preview\s+Only|Not\s+available\s+in\s+Kazakhstan|Region\s+Locked)[^)]*\)/gi, '')
+    .trim();
+
   return {
     id: String(raw.id || raw.providerTrackId || Math.random().toString(36).substring(7)),
     provider: raw.provider || 'soundcloud',
-    title: raw.title || 'Без названия',
+    title: cleanTitle || 'Без названия',
     artist,
     artistName: raw.artistName || artist,
     album,
@@ -54,7 +66,8 @@ function normalizeTrack(raw: any): Track {
     artworkUrl,
     externalUrl,
     permalinkUrl: raw.permalinkUrl || externalUrl,
-    accessState: raw.accessState || 'playable',
+    accessState: 'playable',
+    isRestricted,
     rawPlayCount: raw.rawPlayCount,
     displayScore: raw.displayScore,
   };
@@ -102,7 +115,14 @@ export function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [recommendationMode, setRecommendationMode] = useState('working');
+
+  // Моя Волна (My Wave) state
+  const [waveActivity, setWaveActivity] = useState('working');
+  const [waveMood, setWaveMood] = useState('calm');
+  const [waveCharacter, setWaveCharacter] = useState('favorite');
+  const [waveLanguage, setWaveLanguage] = useState('any');
+  const [isWaveTuningOpen, setIsWaveTuningOpen] = useState(false);
+  const [isWaveActive, setIsWaveActive] = useState(false);
 
   // Hotkey settings
   const [hotkeys, setHotkeys] = useState<HotkeyConfig>({
@@ -218,6 +238,45 @@ export function App() {
   useEffect(() => {
     loadInitialData();
   }, [loadInitialData]);
+
+  // Fetch recommendations for Моя Волна
+  const fetchWaveTracks = useCallback(
+    async (act: string, md: string, char: string, lang: string, autoPlay = false) => {
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/recommendations?activity=${act}&mood=${md}&character=${char}&language=${lang}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const items = (data.recommendations || data.items || data.tracks || []) as any[];
+          const waveList = items
+            .map((item: any) => normalizeTrack(item.track || item))
+            .filter((t: Track) => Boolean(t.id));
+          if (waveList.length > 0) {
+            setTracks(waveList);
+            setIsWaveActive(true);
+            if (autoPlay) {
+              setCurrentTrack(waveList[0]);
+              setPositionMs(0);
+              setIsPlaying(true);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch wave tracks', err);
+      }
+    },
+    []
+  );
+
+  const handleStartWave = () => {
+    if (isPlaying && isWaveActive) {
+      setIsPlaying(false);
+    } else {
+      setIsWaveActive(true);
+      fetchWaveTracks(waveActivity, waveMood, waveCharacter, waveLanguage, true);
+    }
+  };
 
   // Debounced search against Cloudflare Workers API
   useEffect(() => {
@@ -435,83 +494,273 @@ export function App() {
         <main className="flex-1 overflow-y-auto p-6 pb-28">
           {/* Tab 1: Home / Discovery */}
           {activeTab === 'home' && (
-            <div className="space-y-6 max-w-5xl">
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-white">Рекомендации</h1>
-                <p className="text-xs text-slate-400 mt-1">
-                  Умный подбор музыки на основе настроения и предпочтений
-                </p>
-              </div>
+            <div className="space-y-8 max-w-5xl">
+              {/* Hero: Моя Волна (My Wave) */}
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900/95 via-[#0c1424] to-slate-950 border border-slate-800/80 p-6 md:p-8 shadow-2xl">
+                {/* Ambient glowing orb */}
+                <div
+                  className="absolute -right-20 -bottom-20 w-80 h-80 rounded-full blur-3xl opacity-20 pointer-events-none transition-all duration-700"
+                  style={{ backgroundColor: accentColor }}
+                />
 
-              {/* Mode Selector */}
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { id: 'waking_up', label: 'Просыпаюсь' },
-                  { id: 'on_the_road', label: 'В дороге' },
-                  { id: 'working', label: 'Работаю' },
-                  { id: 'training', label: 'Тренируюсь' },
-                  { id: 'falling_asleep', label: 'Засыпаю' },
-                ].map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setRecommendationMode(m.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      recommendationMode === m.id
-                        ? 'text-white shadow-md'
-                        : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
-                    }`}
-                    style={
-                      recommendationMode === m.id
-                        ? { backgroundColor: accentColor }
-                        : {}
-                    }
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
+                <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                  <div className="space-y-2">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[11px] font-semibold text-blue-400">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Умный персональный поток</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <h2 className="text-3xl font-extrabold tracking-tight text-white">
+                        Моя Волна
+                      </h2>
+                      {isPlaying && (
+                        <div className="flex items-end gap-1 h-6 pb-1">
+                          {[40, 90, 60, 100, 50, 80].map((h, i) => (
+                            <span
+                              key={i}
+                              className="w-1 rounded-full animate-pulse"
+                              style={{
+                                height: `${h}%`,
+                                backgroundColor: accentColor,
+                                animationDelay: `${i * 120}ms`,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 max-w-lg leading-relaxed">
+                      Бесконечный непрерывный поток музыки, подбираемый в реальном времени под ваш текущий вайб.
+                    </p>
+                  </div>
 
-              {/* Tracks Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {tracks.map((t) => {
-                  const isCurrent = currentTrack?.id === t.id;
-                  return (
-                    <div
-                      key={t.id}
-                      onClick={() => {
-                        setCurrentTrack(t);
-                        setPositionMs(0);
-                        setIsPlaying(true);
-                      }}
-                      className={`group p-3 rounded-xl cursor-pointer transition-all border ${
-                        isCurrent
-                          ? 'bg-slate-800/80 border-slate-700 shadow-lg'
-                          : 'bg-slate-900/40 hover:bg-slate-900/80 border-slate-800/60'
+                  {/* Big Play and Tune Buttons */}
+                  <div className="flex items-center gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setIsWaveTuningOpen((prev) => !prev)}
+                      className={`inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-xs font-semibold border transition-all ${
+                        isWaveTuningOpen
+                          ? 'bg-slate-800 text-white border-slate-600 shadow-md'
+                          : 'bg-slate-900/80 text-slate-300 hover:text-white hover:bg-slate-800/80 border-slate-700/80'
                       }`}
                     >
-                      <div className="relative aspect-square rounded-lg overflow-hidden bg-slate-950 mb-3 group-hover:scale-[1.02] transition-transform duration-300">
-                        <TrackArtwork artworkUrl={t.artworkUrl} title={t.title} />
-                        <button
-                          type="button"
-                          className="absolute bottom-2 right-2 p-2.5 rounded-full bg-blue-600 text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                          style={{ backgroundColor: accentColor }}
-                        >
-                          <Play className="w-4 h-4 fill-current ml-0.5" />
-                        </button>
-                      </div>
+                      <SlidersHorizontal className="w-4 h-4" />
+                      <span>Настроить</span>
+                    </button>
 
-                      <div className="space-y-1">
-                        <div className="font-semibold text-xs text-white truncate">
-                          {t.title}
-                        </div>
-                        <div className="text-[11px] text-slate-400 truncate">
-                          {t.artist}
-                        </div>
+                    <button
+                      type="button"
+                      onClick={handleStartWave}
+                      className="w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-2xl transition-all hover:scale-105 active:scale-95 group shrink-0"
+                      style={{
+                        backgroundColor: accentColor,
+                        boxShadow: `0 12px 30px -4px ${accentColor}70`,
+                      }}
+                      title={isPlaying && isWaveActive ? 'Пауза' : 'Запустить Мою Волну'}
+                    >
+                      {isPlaying && isWaveActive ? (
+                        <Pause className="w-7 h-7 fill-current" />
+                      ) : (
+                        <Play className="w-7 h-7 fill-current ml-1" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Expandable Wave Tuning Panel */}
+                {isWaveTuningOpen && (
+                  <div className="mt-6 pt-6 border-t border-slate-800/80 space-y-4">
+                    {/* 1. Занятие */}
+                    <div>
+                      <div className="text-[11px] font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+                        Занятие
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { id: 'waking_up', label: 'Просыпаюсь' },
+                          { id: 'commuting', label: 'В дороге' },
+                          { id: 'working', label: 'Работаю' },
+                          { id: 'workout', label: 'Тренируюсь' },
+                          { id: 'sleeping', label: 'Засыпаю' },
+                        ].map((act) => (
+                          <button
+                            key={act.id}
+                            type="button"
+                            onClick={() => {
+                              setWaveActivity(act.id);
+                              fetchWaveTracks(act.id, waveMood, waveCharacter, waveLanguage);
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                              waveActivity === act.id
+                                ? 'text-white shadow-md'
+                                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+                            }`}
+                            style={waveActivity === act.id ? { backgroundColor: accentColor } : {}}
+                          >
+                            {act.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  );
-                })}
+
+                    {/* 2. Настроение */}
+                    <div>
+                      <div className="text-[11px] font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+                        Настроение
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { id: 'calm', label: 'Спокойное' },
+                          { id: 'energetic', label: 'Бодрое' },
+                          { id: 'cheerful', label: 'Весёлое' },
+                          { id: 'melancholic', label: 'Грустное' },
+                        ].map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              setWaveMood(m.id);
+                              fetchWaveTracks(waveActivity, m.id, waveCharacter, waveLanguage);
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                              waveMood === m.id
+                                ? 'text-white shadow-md'
+                                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+                            }`}
+                            style={waveMood === m.id ? { backgroundColor: accentColor } : {}}
+                          >
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 3. Характер */}
+                    <div>
+                      <div className="text-[11px] font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+                        Характер
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { id: 'favorite', label: 'Любимое' },
+                          { id: 'unfamiliar', label: 'Незнакомое' },
+                          { id: 'popular', label: 'Популярное' },
+                        ].map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              setWaveCharacter(c.id);
+                              fetchWaveTracks(waveActivity, waveMood, c.id, waveLanguage);
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                              waveCharacter === c.id
+                                ? 'text-white shadow-md'
+                                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+                            }`}
+                            style={waveCharacter === c.id ? { backgroundColor: accentColor } : {}}
+                          >
+                            {c.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 4. Язык */}
+                    <div>
+                      <div className="text-[11px] font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+                        Язык
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { id: 'any', label: 'Любой' },
+                          { id: 'russian', label: 'Русский' },
+                          { id: 'foreign', label: 'Иностранный' },
+                        ].map((lang) => (
+                          <button
+                            key={lang.id}
+                            type="button"
+                            onClick={() => {
+                              setWaveLanguage(lang.id);
+                              fetchWaveTracks(waveActivity, waveMood, waveCharacter, lang.id);
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                              waveLanguage === lang.id
+                                ? 'text-white shadow-md'
+                                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+                            }`}
+                            style={waveLanguage === lang.id ? { backgroundColor: accentColor } : {}}
+                          >
+                            {lang.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Section: Рекомендации треков */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-white tracking-tight">Рекомендации для вас</h3>
+                    <p className="text-xs text-slate-400">Треки, подобранные на основе вашей истории прослушиваний</p>
+                  </div>
+                </div>
+
+                {/* Tracks Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {tracks.map((t) => {
+                    const isCurrent = currentTrack?.id === t.id;
+                    return (
+                      <div
+                        key={t.id}
+                        onClick={() => {
+                          setCurrentTrack(t);
+                          setPositionMs(0);
+                          setIsPlaying(true);
+                        }}
+                        className={`group p-3 rounded-xl cursor-pointer transition-all border ${
+                          isCurrent
+                            ? 'bg-slate-800/80 border-slate-700 shadow-lg'
+                            : 'bg-slate-900/40 hover:bg-slate-900/80 border-slate-800/60'
+                        }`}
+                      >
+                        <div className="relative aspect-square rounded-lg overflow-hidden bg-slate-950 mb-3 group-hover:scale-[1.02] transition-transform duration-300">
+                          <TrackArtwork artworkUrl={t.artworkUrl} title={t.title} />
+                          <button
+                            type="button"
+                            className="absolute bottom-2 right-2 p-2.5 rounded-full bg-blue-600 text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                            style={{ backgroundColor: accentColor }}
+                          >
+                            <Play className="w-4 h-4 fill-current ml-0.5" />
+                          </button>
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span className="font-semibold text-xs text-white truncate">
+                              {t.title}
+                            </span>
+                            {t.isRestricted && (
+                              <span
+                                className="shrink-0 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 text-[9px] font-bold cursor-help"
+                                title="Ограничено правообладателем в регионе (воспроизводится в обход ограничений)"
+                              >
+                                !
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate">
+                            {t.artist}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
@@ -569,8 +818,16 @@ export function App() {
                           />
                         </div>
                         <div className="truncate">
-                          <div className={`text-xs font-semibold truncate ${isCurrent ? 'text-blue-400' : 'text-white'}`}>
-                            {t.title}
+                          <div className={`text-xs font-semibold truncate flex items-center gap-1.5 ${isCurrent ? 'text-blue-400' : 'text-white'}`}>
+                            <span className="truncate">{t.title}</span>
+                            {t.isRestricted && (
+                              <span
+                                className="shrink-0 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 text-[9px] font-bold cursor-help"
+                                title="Ограничено правообладателем в регионе (воспроизводится в обход ограничений)"
+                              >
+                                !
+                              </span>
+                            )}
                           </div>
                           <div className="text-[11px] text-slate-400 truncate flex items-center gap-2">
                             <span>{t.artist || t.artistName || 'Неизвестный исполнитель'}</span>

@@ -20,9 +20,14 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       return;
     }
     try {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      await getCurrentWindow().minimize();
-    } catch (_: unknown) {}
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('minimize_window');
+    } catch {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        await getCurrentWindow().minimize();
+      } catch (_: unknown) {}
+    }
   };
 
   const handleMaximize = async () => {
@@ -31,9 +36,14 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       return;
     }
     try {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      await getCurrentWindow().toggleMaximize();
-    } catch (_: unknown) {}
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('toggle_maximize_window');
+    } catch {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        await getCurrentWindow().toggleMaximize();
+      } catch (_: unknown) {}
+    }
   };
 
   const handleClose = async () => {
@@ -42,26 +52,41 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       return;
     }
     try {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      await getCurrentWindow().close();
-    } catch (_: unknown) {}
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('close_window');
+    } catch {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        await getCurrentWindow().close();
+      } catch (_: unknown) {}
+    }
   };
 
   const handleMouseDown = async (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest('button, .no-drag')) return;
     try {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      await getCurrentWindow().startDragging();
-    } catch (_: unknown) {}
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('start_dragging');
+    } catch {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        await getCurrentWindow().startDragging();
+      } catch (_: unknown) {}
+    }
   };
 
   const handleDoubleClick = async (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button, .no-drag')) return;
     try {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      await getCurrentWindow().toggleMaximize();
-    } catch (_: unknown) {}
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('toggle_maximize_window');
+    } catch {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        await getCurrentWindow().toggleMaximize();
+      } catch (_: unknown) {}
+    }
   };
 
   return (

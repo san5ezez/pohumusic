@@ -15,6 +15,7 @@ export interface Track {
   externalUrl: string;
   permalinkUrl?: string;
   accessState: AccessState;
+  isRestricted?: boolean;
   previewSeconds?: number;
   rawPlayCount?: number;
   displayScore?: number;

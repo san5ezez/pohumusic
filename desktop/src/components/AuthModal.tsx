@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Mail,
@@ -41,6 +41,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
+  const [oauthPendingProvider, setOauthPendingProvider] = useState<'google' | 'discord' | null>(null);
+  const [oauthPendingUrl, setOauthPendingUrl] = useState<string | null>(null);
+  const pollTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -161,8 +170,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleOAuthLogin = async (provider: 'google' | 'discord') => {
     try {
-      setIsLoading(true);
       setError(null);
+      setSuccessNotice(null);
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+
       const res = await fetch(`${API_BASE_URL}/auth/oauth/${provider}/start`);
       const data = await res.json();
       const authUrl = data.authUrl || data.authorizationUrl;
@@ -170,6 +181,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (!res.ok || !authUrl) {
         throw new Error(data.error?.message || `Не удалось инициировать вход через ${provider}`);
       }
+
+      setOauthPendingProvider(provider);
+      setOauthPendingUrl(authUrl);
 
       // Open OAuth in user's default system browser
       try {
@@ -186,11 +200,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (state) {
         let attempts = 0;
         const maxAttempts = 120; // 2.5 minutes
-        const pollInterval = setInterval(async () => {
+        pollTimerRef.current = setInterval(async () => {
           attempts++;
           if (attempts > maxAttempts) {
-            clearInterval(pollInterval);
-            setIsLoading(false);
+            clearInterval(pollTimerRef.current);
+            setOauthPendingProvider(null);
             return;
           }
 
@@ -201,7 +215,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             if (checkRes.ok) {
               const checkData = await checkRes.json();
               if (checkData.status === 'authenticated' && checkData.tokens?.accessToken) {
-                clearInterval(pollInterval);
+                clearInterval(pollTimerRef.current);
+                setOauthPendingProvider(null);
                 onAuthSuccess(
                   checkData.user,
                   checkData.tokens.accessToken,
@@ -215,7 +230,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
     } catch (err: any) {
       setError(err.message || `Ошибка авторизации через ${provider}`);
-      setIsLoading(false);
+      setOauthPendingProvider(null);
     }
   };
 
@@ -279,6 +294,46 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="mb-4 p-3 bg-emerald-950/60 border border-emerald-800/80 rounded-xl flex items-center gap-2.5 text-xs text-emerald-200">
             <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
             <span>{successNotice}</span>
+          </div>
+        )}
+
+        {/* OAuth Browser Authorization Banner */}
+        {oauthPendingProvider && (
+          <div className="mb-4 p-3.5 bg-blue-950/40 border border-blue-500/40 rounded-xl space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-blue-400 font-semibold">
+                <div className="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                <span>Окно входа открыто в браузере...</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+                  setOauthPendingProvider(null);
+                }}
+                className="text-slate-400 hover:text-white text-[11px]"
+              >
+                Отмена
+              </button>
+            </div>
+            <p className="text-slate-300 text-[11px] leading-relaxed">
+              Выполните вход через {oauthPendingProvider === 'google' ? 'Google' : 'Discord'} в браузере. Приложение синхронизируется автоматически.
+            </p>
+            {oauthPendingUrl && (
+              <button
+                type="button"
+                onClick={() => {
+                  if ((window as any).__TAURI__?.shell?.open) {
+                    (window as any).__TAURI__.shell.open(oauthPendingUrl);
+                  } else {
+                    window.open(oauthPendingUrl, '_blank');
+                  }
+                }}
+                className="text-[11px] text-blue-400 hover:underline block text-left"
+              >
+                Открыть окно входа повторно
+              </button>
+            )}
           </div>
         )}
 

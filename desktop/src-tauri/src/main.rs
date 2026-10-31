@@ -22,13 +22,19 @@ fn close_window<R: Runtime>(_app: AppHandle<R>, window: tauri::Window<R>) {
     window.close().unwrap_or(());
 }
 
+#[tauri::command]
+fn start_dragging<R: Runtime>(_app: AppHandle<R>, window: tauri::Window<R>) {
+    window.start_dragging().unwrap_or(());
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             minimize_window,
             toggle_maximize_window,
-            close_window
+            close_window,
+            start_dragging
         ])
         .run(tauri::generate_context!())
         .expect("error while running PohuMusic Tauri application");
