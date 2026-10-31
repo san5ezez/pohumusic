@@ -72,6 +72,12 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     if (isPlaying) {
       sendIframeCommand('playVideo');
       sendIframeCommand('play');
+      // If resuming from pause at a later position, ensure iframe player seeks to exact saved time
+      if (positionRef.current > 1000) {
+        const seekSec = Math.floor(positionRef.current / 1000);
+        sendIframeCommand('seekTo', [seekSec, true]);
+        sendIframeCommand('seekTo', [positionRef.current]);
+      }
     } else {
       sendIframeCommand('pauseVideo');
       sendIframeCommand('pause');
