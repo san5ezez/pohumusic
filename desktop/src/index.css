@@ -1,5 +1,6 @@
-@import "tailwindcss";
-@custom-variant dark (&:where(.dark, .dark *));
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @layer base {
   :root {
@@ -7,20 +8,15 @@
   }
 
   body {
-    font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    overflow: hidden;
     background-color: #090d16;
     color: #f1f5f9;
     margin: 0;
   }
-
-  code,
-  pre,
-  .font-mono {
-    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-    font-variant-numeric: tabular-nums;
-  }
 }
 
-.tabular-nums {
-  font-variant-numeric: tabular-nums;
+.no-drag {
+  -webkit-app-region: no-drag;
 }
