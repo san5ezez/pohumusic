@@ -49,20 +49,44 @@ jobs:
           CLOUDFLARE_D1_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_DATABASE_ID }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::notice::CLOUDFLARE_API_TOKEN secret is not set. Skipping Cloudflare Workers deployment."
+            echo "::notice title=Cloudflare Deploy Skipped::Secret CLOUDFLARE_API_TOKEN is not set. Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in Repository Settings -> Secrets."
             exit 0
           fi
 
+          echo "Configuring Cloudflare environment..."
+
           if [ -n "$CLOUDFLARE_D1_DATABASE_ID" ]; then
             sed -i "s/00000000-0000-0000-0000-000000000001/$CLOUDFLARE_D1_DATABASE_ID/g" wrangler.toml
-            echo "Injected CLOUDFLARE_D1_DATABASE_ID into wrangler.toml"
+            echo "Using provided CLOUDFLARE_D1_DATABASE_ID: $CLOUDFLARE_D1_DATABASE_ID"
+          elif grep -q "00000000-0000-0000-0000-000000000001" wrangler.toml; then
+            CREATE_D1_OUT=$(npx wrangler d1 create pohumusic-db 2>&1 || true)
+            DETECTED_D1_ID=$(echo "$CREATE_D1_OUT" | grep -oE '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -n 1)
+            if [ -z "$DETECTED_D1_ID" ]; then
+              DETECTED_D1_ID=$(npx wrangler d1 list --json 2>/dev/null | grep -oE '"uuid":\s*"[a-f0-9-]{36}"' | head -n 1 | tr -d '": ' | sed 's/uuid//' || true)
+            fi
+            if [ -n "$DETECTED_D1_ID" ]; then
+              sed -i "s/00000000-0000-0000-0000-000000000001/$DETECTED_D1_ID/g" wrangler.toml
+              echo "Auto-configured D1 database_id in wrangler.toml: $DETECTED_D1_ID"
+            fi
           fi
 
-          if grep -q "00000000-0000-0000-0000-000000000001" wrangler.toml; then
-            echo "::warning::Cloudflare D1 database_id in wrangler.toml is still the placeholder. Skipping remote migration."
-          else
+          if grep -q "pohumusic_kv_namespace_id" wrangler.toml; then
+            CREATE_KV_OUT=$(npx wrangler kv namespace create KV 2>&1 || true)
+            DETECTED_KV_ID=$(echo "$CREATE_KV_OUT" | grep -oE 'id = "[a-f0-9]{32}"' | head -n 1 | cut -d'"' -f2 || true)
+            if [ -z "$DETECTED_KV_ID" ]; then
+              DETECTED_KV_ID=$(npx wrangler kv namespace list 2>/dev/null | grep -oE '"id":\s*"[a-f0-9]{32}"' | head -n 1 | tr -d '": ' | sed 's/id//' || true)
+            fi
+            if [ -n "$DETECTED_KV_ID" ]; then
+              sed -i "s/pohumusic_kv_namespace_id/$DETECTED_KV_ID/g" wrangler.toml
+              sed -i "s/pohumusic_kv_preview_id/$DETECTED_KV_ID/g" wrangler.toml
+              echo "Auto-configured KV namespace ID in wrangler.toml: $DETECTED_KV_ID"
+            fi
+          fi
+
+          if ! grep -q "00000000-0000-0000-0000-000000000001" wrangler.toml; then
             echo "Applying Cloudflare D1 remote migrations..."
             npx wrangler d1 migrations apply pohumusic-db --remote || true
-            echo "Deploying Cloudflare Worker..."
-            npx wrangler deploy
           fi
+
+          echo "Deploying Cloudflare Worker..."
+          npx wrangler deploy

@@ -230,7 +230,7 @@ fun ProfileScreen(
                             try {
                                 ApiClient.service.deleteAccount()
                                 onLogout()
-                            } catch (_: Exception) {}
+                            } catch (e: Exception) {}
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)

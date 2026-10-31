@@ -93,7 +93,7 @@ class PlaybackManager(private val context: Context) {
                         val tracksData = relRes.body()?.get("tracks") as? List<Map<String, Any>>
                         // Pre-append up to 3 next tracks to the queue
                     }
-                } catch (_: Exception) {}
+                } catch (e: Exception) {}
             }
         }
 
@@ -198,7 +198,7 @@ class PlaybackManager(private val context: Context) {
                 equalizer?.enabled = enabled
             }
             _uiState.value = _uiState.value.copy(isEqualizerEnabled = enabled)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             _uiState.value = _uiState.value.copy(isEqualizerEnabled = false)
         }
     }

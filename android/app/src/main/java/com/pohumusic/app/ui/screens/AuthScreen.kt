@@ -243,7 +243,7 @@ fun AuthScreen(
                                 } else {
                                     errorMessage = "Не удалось отправить письмо: код ${res.code()}"
                                 }
-                            } catch (_: Exception) {}
+                            } catch (e: Exception) {}
                             showForgotDialog = false
                         }
                     },

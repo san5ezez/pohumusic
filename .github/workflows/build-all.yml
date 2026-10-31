@@ -53,25 +53,59 @@ jobs:
           CLOUDFLARE_D1_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_DATABASE_ID }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::notice::CLOUDFLARE_API_TOKEN secret is not configured in GitHub repository secrets. Skipping Cloudflare Workers deployment."
+            echo "::notice title=Cloudflare Deploy Skipped::Secret CLOUDFLARE_API_TOKEN is not configured in GitHub repository secrets. To enable automatic deployment to Cloudflare Workers, add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in Repository Settings -> Secrets and variables -> Actions."
             exit 0
           fi
 
-          # If CLOUDFLARE_D1_DATABASE_ID is provided as a secret, inject it into wrangler.toml
+          echo "Configuring Cloudflare environment..."
+
+          # 1. Resolve or Create D1 Database
           if [ -n "$CLOUDFLARE_D1_DATABASE_ID" ]; then
             sed -i "s/00000000-0000-0000-0000-000000000001/$CLOUDFLARE_D1_DATABASE_ID/g" wrangler.toml
-            echo "Injected CLOUDFLARE_D1_DATABASE_ID secret into wrangler.toml"
+            echo "Using provided CLOUDFLARE_D1_DATABASE_ID: $CLOUDFLARE_D1_DATABASE_ID"
+          elif grep -q "00000000-0000-0000-0000-000000000001" wrangler.toml; then
+            echo "D1 database_id has placeholder. Attempting auto-detection / creation of 'pohumusic-db'..."
+            CREATE_D1_OUT=$(npx wrangler d1 create pohumusic-db 2>&1 || true)
+            DETECTED_D1_ID=$(echo "$CREATE_D1_OUT" | grep -oE '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -n 1)
+            
+            if [ -z "$DETECTED_D1_ID" ]; then
+              DETECTED_D1_ID=$(npx wrangler d1 list --json 2>/dev/null | grep -oE '"uuid":\s*"[a-f0-9-]{36}"' | head -n 1 | tr -d '": ' | sed 's/uuid//' || true)
+            fi
+
+            if [ -n "$DETECTED_D1_ID" ]; then
+              sed -i "s/00000000-0000-0000-0000-000000000001/$DETECTED_D1_ID/g" wrangler.toml
+              echo "Auto-configured D1 database_id in wrangler.toml: $DETECTED_D1_ID"
+            else
+              echo "::warning::Could not automatically detect or create D1 database 'pohumusic-db'. You can create it in Cloudflare Dashboard and add CLOUDFLARE_D1_DATABASE_ID to GitHub Secrets."
+            fi
           fi
 
-          # Verify if D1 database_id is still the dummy placeholder
-          if grep -q "00000000-0000-0000-0000-000000000001" wrangler.toml; then
-            echo "::warning::Cloudflare D1 database_id in wrangler.toml is still the placeholder (00000000-0000-0000-0000-000000000001). To deploy live, run 'npx wrangler d1 create pohumusic-db' and add the returned database_id to wrangler.toml or create secret CLOUDFLARE_D1_DATABASE_ID. Skipping remote migration."
-          else
-            echo "Applying Cloudflare D1 remote migrations..."
-            npx wrangler d1 migrations apply pohumusic-db --remote || true
-            echo "Deploying Cloudflare Worker..."
-            npx wrangler deploy
+          # 2. Resolve or Create KV Namespace
+          if grep -q "pohumusic_kv_namespace_id" wrangler.toml; then
+            echo "Checking KV namespace..."
+            CREATE_KV_OUT=$(npx wrangler kv namespace create KV 2>&1 || true)
+            DETECTED_KV_ID=$(echo "$CREATE_KV_OUT" | grep -oE 'id = "[a-f0-9]{32}"' | head -n 1 | cut -d'"' -f2 || true)
+            
+            if [ -z "$DETECTED_KV_ID" ]; then
+              DETECTED_KV_ID=$(npx wrangler kv namespace list 2>/dev/null | grep -oE '"id":\s*"[a-f0-9]{32}"' | head -n 1 | tr -d '": ' | sed 's/id//' || true)
+            fi
+
+            if [ -n "$DETECTED_KV_ID" ]; then
+              sed -i "s/pohumusic_kv_namespace_id/$DETECTED_KV_ID/g" wrangler.toml
+              sed -i "s/pohumusic_kv_preview_id/$DETECTED_KV_ID/g" wrangler.toml
+              echo "Auto-configured KV namespace ID in wrangler.toml: $DETECTED_KV_ID"
+            fi
           fi
+
+          # 3. Apply Remote Migrations if database_id is resolved
+          if ! grep -q "00000000-0000-0000-0000-000000000001" wrangler.toml; then
+            echo "Applying Cloudflare D1 migrations to remote database..."
+            npx wrangler d1 migrations apply pohumusic-db --remote || true
+          fi
+
+          # 4. Deploy Cloudflare Worker with Static Assets
+          echo "Deploying Cloudflare Worker..."
+          npx wrangler deploy
 
   # ============================================================================
   # 2. Android Client Build (Debug & Release APK via Gradle)
@@ -165,7 +199,7 @@ jobs:
           releaseBody: 'PohuMusic Windows Desktop & Android Release'
           releaseDraft: false
           prerelease: false
-          args: --no-version-check
+          args: --ignore-version-mismatches
 
       - name: Upload Windows Executables
         uses: actions/upload-artifact@v4
