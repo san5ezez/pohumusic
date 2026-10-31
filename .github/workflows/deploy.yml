@@ -10,6 +10,9 @@ on:
       - 'wrangler.toml'
       - 'package.json'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 concurrency:
   group: cloudflare-deploy-${{ github.ref }}
   cancel-in-progress: true
@@ -22,10 +25,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
 
@@ -36,7 +39,7 @@ jobs:
         run: npm run lint
 
       - name: Run unit & integration tests
-        run: npx --yes tsx --test workers/src/tests/backend.test.ts
+        run: npx --yes tsx --test workers/src/tests/*.test.ts
 
       - name: Build static frontend assets for Workers Static Assets
         run: npm run build
