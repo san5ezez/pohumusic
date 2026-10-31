@@ -34,7 +34,7 @@ historyRouter.get('/', requireAuthMiddleware, async (c) => {
             track_json, played_at, updated_at
      FROM listening_history
      WHERE user_id = ?
-     ORDER BY played_at DESC
+     ORDER BY played_at DESC, rowid DESC
      LIMIT ?`
   )
     .bind(user.id, APP_CONSTANTS.MAX_UNIQUE_HISTORY_TRACKS)
@@ -174,7 +174,7 @@ historyRouter.post('/', requireAuthMiddleware, async (c) => {
        AND id NOT IN (
          SELECT id FROM listening_history
          WHERE user_id = ?
-         ORDER BY played_at DESC
+         ORDER BY played_at DESC, rowid DESC
          LIMIT ?
        )`
   )

@@ -148,7 +148,7 @@ jobs:
       - name: Build Windows Tauri Bundle (.exe)
         working-directory: ./desktop
         shell: bash
-        run: npx tauri build --ignore-version-mismatches
+        run: npm run tauri build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_CLI_NO_VERSION_CHECK: "true"

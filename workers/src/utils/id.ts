@@ -26,6 +26,13 @@ export function generateSecureHexToken(byteLength = 32): string {
     .join('');
 }
 
+let lastMs = 0;
+
 export function nowIso(): string {
-  return new Date().toISOString();
+  let now = Date.now();
+  if (now <= lastMs) {
+    now = lastMs + 1;
+  }
+  lastMs = now;
+  return new Date(now).toISOString();
 }
