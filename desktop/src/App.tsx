@@ -1,491 +1,683 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { TitleBar } from './components/TitleBar';
-import { Sidebar } from './components/Sidebar';
-import { DesktopMiniPlayer } from './components/DesktopMiniPlayer';
-import { DesktopFullScreenPlayer } from './components/DesktopFullScreenPlayer';
-import { HotkeyConfigModal } from './components/HotkeyConfigModal';
-import { SplashScreen } from './components/SplashScreen';
-import { API_BASE_URL } from './config/api';
-import type { Track, HotkeyConfig, Playlist, HistoryItem } from './types';
+import React, { useEffect, useState, useCallback } from 'react';
+import { CatalogPlayerView } from './components/CatalogPlayerView';
 import {
-  Play,
-  Sparkles,
-  WifiOff,
-  Search as SearchIcon,
-  Plus,
-  Share2,
-} from 'lucide-react';
+  RecommendationsView,
+  type RecommendationItem,
+  type SimilarTrackItem,
+} from './components/RecommendationsView';
+import { LibrarySyncView } from './components/LibrarySyncView';
+import { ApiAuditWorkbenchView } from './components/ApiAuditWorkbenchView';
+import { AdminConsoleView } from './components/AdminConsoleView';
+import { ClientAppsShowroomView } from './components/ClientAppsShowroomView';
+import type {
+  PlaybackInfo,
+  PlayerDeviceSession,
+  ProviderSource,
+  Track,
+} from './types/api';
+
+type ActiveTab = 'catalog' | 'recommendations' | 'library' | 'workbench' | 'admin' | 'clients';
 
 export function App() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('home');
-  const [accentColor, setAccentColor] = useState('#2563eb');
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
-  const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isHotkeyModalOpen, setIsHotkeyModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('catalog');
 
-  // Playback state
+  // Demo Session Tokens (Admin vs Listener)
+  const [adminToken, setAdminToken] = useState<string>('');
+  const [listenerToken, setListenerToken] = useState<string>('');
+  const [activeRoleMode, setActiveRoleMode] = useState<'admin' | 'user'>('admin');
+  const [defaultShareId, setDefaultShareId] = useState<string>('pohuNight26');
+
+  const currentToken = activeRoleMode === 'admin' ? adminToken : listenerToken;
+
+  // Catalog & Player state
   const [tracks, setTracks] = useState<Track[]>([]);
-  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [positionMs, setPositionMs] = useState(0);
-  const [volume, setVolume] = useState(0.8);
-  const [isShuffle, setIsShuffle] = useState(false);
-  const [isRepeat, setIsRepeat] = useState(false);
-  const [favorites, setFavorites] = useState<Set<string>>(new Set(['sc_1901001']));
-
-  // Library state
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [recommendationMode, setRecommendationMode] = useState('working');
+  const [providerFilter, setProviderFilter] = useState<'all' | ProviderSource>('all');
+  const [accessFilter, setAccessFilter] = useState<string>('all');
+  const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+  const [playbackInfo, setPlaybackInfo] = useState<PlaybackInfo | null>(null);
+  const [activeSession, setActiveSession] = useState<PlayerDeviceSession | null>(null);
+  const [devices, setDevices] = useState<PlayerDeviceSession[]>([]);
+  const [syncConflictNotice, setSyncConflictNotice] = useState<string | null>(null);
 
-  // Hotkey settings
-  const [hotkeys, setHotkeys] = useState<HotkeyConfig>({
-    playPause: 'Space',
-    nextTrack: 'ArrowRight',
-    prevTrack: 'ArrowLeft',
-    volumeUp: 'ArrowUp',
-    volumeDown: 'ArrowDown',
-  });
+  // Recommendations state
+  const [recActivity, setRecActivity] = useState('working');
+  const [recCharacter, setRecCharacter] = useState('favorite');
+  const [recMood, setRecMood] = useState('calm');
+  const [recLanguage, setRecLanguage] = useState('any');
+  const [recommendations, setRecommendations] = useState<RecommendationItem[]>([]);
+  const [similarSeedTrack, setSimilarSeedTrack] = useState<Track | null>(null);
+  const [similarTracks, setSimilarTracks] = useState<SimilarTrackItem[]>([]);
+  const [feedbackStatus, setFeedbackStatus] = useState<string | null>(null);
 
-  // Network offline listener
-  useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
+  // Library & Profile state
+  const [playlists, setPlaylists] = useState<Array<any>>([]);
+  const [favorites, setFavorites] = useState<Array<any>>([]);
+  const [history, setHistory] = useState<Array<any>>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [sharedPlaylistPreview, setSharedPlaylistPreview] = useState<Record<string, any> | null>(
+    null
+  );
+  const [libraryNotice, setLibraryNotice] = useState<string | null>(null);
 
-  // Fetch initial tracks & library data from Cloudflare Workers backend
-  const loadInitialData = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/tracks/search?limit=30`);
-      if (res.ok) {
-        const data = await res.json();
-        const list = (data.tracks || []) as Track[];
-        setTracks(list);
-        if (list.length > 0 && !currentTrack) {
-          setCurrentTrack(list[0]);
+  // Health & Admin state
+  const [healthInfo, setHealthInfo] = useState<Record<string, any> | null>(null);
+  const [adminStats, setAdminStats] = useState<Record<string, any> | null>(null);
+  const [adminUsers, setAdminUsers] = useState<Array<any>>([]);
+  const [adminErrors, setAdminErrors] = useState<Array<any>>([]);
+  const [adminSettings, setAdminSettings] = useState<Array<any>>([]);
+  const [adminNotice, setAdminNotice] = useState<string | null>(null);
+
+  const authFetch = useCallback(
+    async (path: string, init: RequestInit = {}) => {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...((init.headers as Record<string, string>) || {}),
+      };
+      if (currentToken) {
+        headers['Authorization'] = `Bearer ${currentToken}`;
+      }
+      return fetch(path, { ...init, headers });
+    },
+    [currentToken]
+  );
+
+  const loadCatalog = useCallback(
+    async (q: string, prov: 'all' | ProviderSource, acc: string) => {
+      const params = new URLSearchParams();
+      if (q) params.set('q', q);
+      params.set('provider', prov);
+      if (acc !== 'all') params.set('access', acc);
+
+      const res = await fetch(`/api/v1/tracks/search?${params.toString()}`);
+      const data = await res.json();
+      const list = (data.tracks || []) as Track[];
+      setTracks(list);
+      if (list.length > 0 && !selectedTrack) {
+        const first = list[0];
+        setSelectedTrack(first);
+        const pbRes = await fetch(`/api/v1/tracks/${encodeURIComponent(first.id)}`);
+        if (pbRes.ok) {
+          const pbData = await pbRes.json();
+          setPlaybackInfo(pbData.playback);
         }
       }
+    },
+    [selectedTrack]
+  );
 
-      // Load sample playlists & history
-      const plRes = await fetch(`${API_BASE_URL}/playlists`);
-      if (plRes.ok) {
-        const pData = await plRes.json();
-        setPlaylists((pData.playlists || []) as Playlist[]);
+  const loadRecommendations = useCallback(
+    async (act: string, char: string, md: string, lang: string) => {
+      const params = new URLSearchParams({
+        activity: act,
+        character: char,
+        mood: md,
+        language: lang,
+      });
+      const res = await authFetch(`/api/v1/recommendations?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setRecommendations(data.recommendations || []);
       }
-    } catch (_: unknown) {
-      // Offline or network error handled gracefully
-    } finally {
-      setTimeout(() => setIsLoading(false), 600);
+    },
+    [authFetch]
+  );
+
+  const loadSimilarTracks = useCallback(async (track: Track) => {
+    setSimilarSeedTrack(track);
+    const res = await fetch(`/api/v1/recommendations/track/${encodeURIComponent(track.id)}`);
+    if (res.ok) {
+      const data = await res.json();
+      setSimilarTracks(data.similarTracks || []);
     }
-  }, [currentTrack]);
+  }, []);
 
-  useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
+  const loadUserLibraryAndState = useCallback(async () => {
+    if (!currentToken) return;
+    const [meRes, plRes, favRes, histRes, stateRes] = await Promise.all([
+      authFetch('/api/v1/users/me'),
+      authFetch('/api/v1/playlists'),
+      authFetch('/api/v1/library/favorites'),
+      authFetch('/api/v1/history'),
+      authFetch('/api/v1/player/state'),
+    ]);
 
-  // In-focus hotkey listeners (Only active when window has focus)
+    if (meRes.ok) {
+      const meData = await meRes.json();
+      setCurrentUser(meData.user);
+    }
+    if (plRes.ok) {
+      const plData = await plRes.json();
+      setPlaylists(plData.playlists || []);
+    }
+    if (favRes.ok) {
+      const favData = await favRes.json();
+      setFavorites(favData.favorites || []);
+    }
+    if (histRes.ok) {
+      const histData = await histRes.json();
+      setHistory(histData.history || []);
+    }
+    if (stateRes.ok) {
+      const stData = await stateRes.json();
+      setActiveSession(stData.activeSession || null);
+      setDevices(stData.devices || []);
+    }
+  }, [authFetch, currentToken]);
+
+  const loadAdminTelemetry = useCallback(async () => {
+    if (!currentToken || activeRoleMode !== 'admin') {
+      setAdminStats(null);
+      return;
+    }
+    const [statRes, usrRes, errRes, setRes] = await Promise.all([
+      authFetch('/api/v1/admin/statistics'),
+      authFetch('/api/v1/admin/users'),
+      authFetch('/api/v1/admin/errors'),
+      authFetch('/api/v1/admin/settings'),
+    ]);
+    if (statRes.ok) setAdminStats(await statRes.json());
+    if (usrRes.ok) {
+      const u = await usrRes.json();
+      setAdminUsers(u.users || []);
+    }
+    if (errRes.ok) {
+      const e = await errRes.json();
+      setAdminErrors(e.logs || []);
+    }
+    if (setRes.ok) {
+      const s = await setRes.json();
+      setAdminSettings(s.settings || []);
+    }
+  }, [authFetch, currentToken, activeRoleMode]);
+
+  // Initial bootstrap
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Do not trigger hotkeys if user is typing in an input or textarea
-      if (
-        document.activeElement?.tagName === 'INPUT' ||
-        document.activeElement?.tagName === 'TEXTAREA'
-      ) {
-        return;
+    async function init() {
+      const [demoRes, healthRes] = await Promise.all([
+        fetch('/api/v1/demo-session'),
+        fetch('/api/v1/health'),
+      ]);
+      if (healthRes.ok) {
+        setHealthInfo(await healthRes.json());
       }
+      if (demoRes.ok) {
+        const demo = await demoRes.json();
+        setAdminToken(demo.adminAccessToken);
+        setListenerToken(demo.listenerAccessToken);
+        setDefaultShareId(demo.defaultShareId || 'pohuNight26');
+      }
+    }
+    init();
+  }, []);
 
-      if (e.code === hotkeys.playPause) {
-        e.preventDefault();
-        setIsPlaying((prev) => !prev);
-      } else if (e.code === hotkeys.nextTrack) {
-        e.preventDefault();
-        handleNext();
-      } else if (e.code === hotkeys.prevTrack) {
-        e.preventDefault();
-        handlePrev();
-      } else if (e.code === hotkeys.volumeUp) {
-        e.preventDefault();
-        setVolume((v) => Math.min(1, v + 0.05));
-      } else if (e.code === hotkeys.volumeDown) {
-        e.preventDefault();
-        setVolume((v) => Math.max(0, v - 0.05));
+  useEffect(() => {
+    const handleOAuthMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.tokens) {
+        const { tokens, user, provider } = event.data;
+        if (user.role === 'admin') {
+          setAdminToken(tokens.accessToken);
+          setActiveRoleMode('admin');
+        } else {
+          setListenerToken(tokens.accessToken);
+          setActiveRoleMode('user');
+        }
+        setCurrentUser(user);
+        setLibraryNotice(
+          `Успешный вход через ${String(provider).toUpperCase()}: авторизован пользователь ${user.displayName || user.username} (${user.email})`
+        );
       }
     };
+    window.addEventListener('message', handleOAuthMessage);
+    return () => window.removeEventListener('message', handleOAuthMessage);
+  }, []);
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [hotkeys, tracks, currentTrack]);
+  useEffect(() => {
+    loadCatalog(searchQuery, providerFilter, accessFilter);
+  }, [providerFilter, accessFilter]);
 
-  const handleNext = () => {
-    if (!currentTrack || tracks.length === 0) return;
-    const idx = tracks.findIndex((t) => t.id === currentTrack.id);
-    if (idx !== -1 && idx + 1 < tracks.length) {
-      setCurrentTrack(tracks[idx + 1]);
-      setPositionMs(0);
-      setIsPlaying(true);
+  useEffect(() => {
+    if (!currentToken) return;
+    loadUserLibraryAndState();
+    loadRecommendations(recActivity, recCharacter, recMood, recLanguage);
+    loadAdminTelemetry();
+  }, [
+    currentToken,
+    activeRoleMode,
+    recActivity,
+    recCharacter,
+    recMood,
+    recLanguage,
+    loadUserLibraryAndState,
+    loadRecommendations,
+    loadAdminTelemetry,
+  ]);
+
+  useEffect(() => {
+    if (tracks.length > 0 && !similarSeedTrack) {
+      loadSimilarTracks(tracks[0]);
+    }
+  }, [tracks, similarSeedTrack, loadSimilarTracks]);
+
+  const handleSelectTrack = async (track: Track) => {
+    setSelectedTrack(track);
+    const res = await fetch(`/api/v1/tracks/${encodeURIComponent(track.id)}`);
+    if (res.ok) {
+      const data = await res.json();
+      setPlaybackInfo(data.playback);
+    }
+    // Record listen in D1 history & sync player state if track is playable/preview
+    if (currentToken) {
+      await authFetch('/api/v1/history', {
+        method: 'POST',
+        body: JSON.stringify({
+          trackId: track.id,
+          track,
+          listenedMs: track.durationMs,
+          wasSkipped: false,
+        }),
+      });
+      if (track.accessState !== 'blocked') {
+        const targetDevice = activeSession?.deviceId || 'dev_studio_mac';
+        const targetName = activeSession?.deviceName || 'MacBook Pro — Studio Monitor';
+        await authFetch('/api/v1/player/state', {
+          method: 'PUT',
+          body: JSON.stringify({
+            deviceId: targetDevice,
+            deviceName: targetName,
+            activateDevice: true,
+            currentTrack: track,
+            isPlaying: true,
+            positionMs: 0,
+          }),
+        });
+      }
+      await loadUserLibraryAndState();
     }
   };
 
-  const handlePrev = () => {
-    if (!currentTrack || tracks.length === 0) return;
-    const idx = tracks.findIndex((t) => t.id === currentTrack.id);
-    if (idx > 0) {
-      setCurrentTrack(tracks[idx - 1]);
-      setPositionMs(0);
-      setIsPlaying(true);
+  const handleToggleFavorite = async (track: Track) => {
+    const isFav = favorites.some((f) => f.trackId === track.id);
+    if (isFav) {
+      await authFetch(`/api/v1/library/favorites/${encodeURIComponent(track.id)}`, {
+        method: 'DELETE',
+      });
+    } else {
+      await authFetch('/api/v1/library/favorites', {
+        method: 'POST',
+        body: JSON.stringify({ trackId: track.id, track }),
+      });
     }
+    await loadUserLibraryAndState();
   };
 
-  const toggleFavorite = (trackId: string) => {
-    setFavorites((prev) => {
-      const next = new Set(prev);
-      if (next.has(trackId)) next.delete(trackId);
-      else next.add(trackId);
-      return next;
+  const handleAddTrackToPlaylist = async (playlistId: string, track: Track) => {
+    const res = await authFetch(`/api/v1/playlists/${encodeURIComponent(playlistId)}/tracks`, {
+      method: 'POST',
+      body: JSON.stringify({ trackId: track.id, track }),
     });
+    if (res.ok) {
+      setLibraryNotice(`Трек «${track.title}» добавлен в плейлист.`);
+      await loadUserLibraryAndState();
+    }
   };
 
-  if (isLoading) {
-    return <SplashScreen />;
-  }
+  const handleSwitchActiveDevice = async (
+    deviceId: string,
+    deviceName: string,
+    startPlaying: boolean
+  ) => {
+    setSyncConflictNotice(null);
+    const res = await authFetch('/api/v1/player/state', {
+      method: 'PUT',
+      body: JSON.stringify({
+        deviceId,
+        deviceName,
+        activateDevice: true,
+        isPlaying: startPlaying,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setActiveSession(data.state);
+      setDevices(data.devices || []);
+      if (data.deactivatedOtherDevices) {
+        setSyncConflictNotice(
+          `Активное устройство переключено на «${deviceName}». Воспроизведение на остальных устройствах автоматически поставлено на паузу.`
+        );
+      }
+    }
+  };
+
+  const handleSimulateVersionConflict = async () => {
+    const devId = activeSession?.deviceId || 'dev_studio_mac';
+    const res = await authFetch('/api/v1/player/state', {
+      method: 'PUT',
+      body: JSON.stringify({
+        deviceId: devId,
+        positionMs: 99000,
+        expectedVersion: 9999,
+      }),
+    });
+    const data = await res.json();
+    if (res.status === 409) {
+      setSyncConflictNotice(`HTTP 409 ${data.error?.code}: ${data.error?.message}`);
+    }
+  };
+
+  const favoriteIds = new Set(favorites.map((f) => f.trackId as string));
+
+  const handleTabSwitch = (nextTab: ActiveTab) => {
+    setActiveTab(nextTab);
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+  };
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#090d16] text-slate-100 overflow-hidden select-none font-sans">
-      {/* 1. Custom Frameless Windows TitleBar */}
-      <TitleBar />
+    <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col">
+      {/* Top Bar Contract: Strictly 3 zones separated by gap-8 */}
+      <header className="flex items-center justify-between gap-8 px-6 py-4 border-b border-slate-800 bg-slate-950/90 sticky top-0 z-30 backdrop-blur">
+        {/* Zone 1: Single text element wordmark */}
+        <a
+          href="#catalog"
+          onClick={(e) => {
+            e.preventDefault();
+            handleTabSwitch('catalog');
+          }}
+          className="text-lg font-bold tracking-tight text-slate-100 whitespace-nowrap shrink-0"
+        >
+          PohuMusic
+        </a>
 
-      {/* 2. Main Workspace Layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Navigation Sidebar */}
-        <Sidebar
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          accentColor={accentColor}
-          onOpenHotkeys={() => setIsHotkeyModalOpen(true)}
-          playlistsCount={playlists.length}
-        />
+        {/* Zone 2: 5 concise single-line navigation links */}
+        <nav aria-label="Основная навигация" className="flex items-center gap-6 text-sm font-medium overflow-x-auto">
+          {[
+            { id: 'catalog', label: 'Каталог и плеер' },
+            { id: 'clients', label: 'Клиенты (APK / EXE)' },
+            { id: 'recommendations', label: 'Рекомендации' },
+            { id: 'library', label: 'Библиотека и D1' },
+            { id: 'workbench', label: 'API и SoundCloud.ts' },
+            { id: 'admin', label: 'Админ-панель' },
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => handleTabSwitch(item.id as ActiveTab)}
+              className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
+                activeTab === item.id
+                  ? 'border-blue-500 text-blue-400 font-semibold'
+                  : 'border-transparent text-slate-400 hover:text-slate-100'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
 
-        {/* Central Content Area */}
-        <main className="flex-1 bg-[#0c1222] overflow-y-auto p-6 space-y-6">
-          {/* Offline Warning Banner */}
-          {isOffline && (
-            <div className="p-3 bg-amber-950/70 border border-amber-800 rounded-xl flex items-center gap-3 text-xs text-amber-200">
-              <WifiOff className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>
-                Отсутствует подключение к сети. Воспроизведение треков и синхронизация приостановлены.
-              </span>
-            </div>
-          )}
+        {/* Zone 3: 1 primary action button */}
+        <div className="flex items-center shrink-0">
+          <button
+            type="button"
+            onClick={() =>
+              setActiveRoleMode((prev) => (prev === 'admin' ? 'user' : 'admin'))
+            }
+            className="px-4 py-2 text-xs font-semibold text-slate-950 bg-amber-500 hover:bg-amber-400 rounded-lg transition-colors whitespace-nowrap shrink-0"
+          >
+            {activeRoleMode === 'admin'
+              ? 'Сессия: Admin (@sanchez_admin)'
+              : 'Сессия: User (@nikita_wave)'}
+          </button>
+        </div>
+      </header>
 
-          {/* Tab 1: Home / For You */}
-          {activeTab === 'home' && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-bold tracking-tight text-white">Для тебя</h1>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Персональный поток на основе алгоритма рекомендаций PohuMusic
-                  </p>
-                </div>
+      {/* Main Content Container */}
+      <main className="flex-1 max-w-[1380px] w-full mx-auto px-6 py-8">
+        {activeTab === 'catalog' && (
+          <CatalogPlayerView
+            tracks={tracks}
+            searchQuery={searchQuery}
+            providerFilter={providerFilter}
+            accessFilter={accessFilter}
+            selectedTrack={selectedTrack}
+            playbackInfo={playbackInfo}
+            activeSession={activeSession}
+            devices={devices}
+            favoriteIds={favoriteIds}
+            playlists={playlists}
+            syncConflictNotice={syncConflictNotice}
+            onSearchChange={setSearchQuery}
+            onProviderFilterChange={setProviderFilter}
+            onAccessFilterChange={setAccessFilter}
+            onExecuteSearch={(e) => {
+              if (e) e.preventDefault();
+              loadCatalog(searchQuery, providerFilter, accessFilter);
+            }}
+            onSelectTrack={handleSelectTrack}
+            onToggleFavorite={handleToggleFavorite}
+            onAddTrackToPlaylist={handleAddTrackToPlaylist}
+            onSwitchActiveDevice={handleSwitchActiveDevice}
+            onSimulateVersionConflict={handleSimulateVersionConflict}
+          />
+        )}
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400">Режим:</span>
-                  {['working', 'commuting', 'workout', 'calm'].map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => setRecommendationMode(mode)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                        recommendationMode === mode
-                          ? 'text-white'
-                          : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
-                      }`}
-                      style={
-                        recommendationMode === mode
-                          ? { backgroundColor: accentColor }
-                          : {}
-                      }
-                    >
-                      {mode === 'working'
-                        ? 'Работа'
-                        : mode === 'commuting'
-                        ? 'В дороге'
-                        : mode === 'workout'
-                        ? 'Спорт'
-                        : 'Спокойствие'}
-                    </button>
-                  ))}
-                </div>
-              </div>
+        {activeTab === 'clients' && (
+          <ClientAppsShowroomView
+            tracks={tracks}
+            selectedTrack={selectedTrack}
+            onSelectTrack={handleSelectTrack}
+          />
+        )}
 
-              {/* Curated Grid of Tracks */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {tracks.map((track) => {
-                  const isCurrent = currentTrack?.id === track.id;
-                  return (
-                    <div
-                      key={track.id}
-                      onClick={() => {
-                        setCurrentTrack(track);
-                        setIsPlaying(true);
-                      }}
-                      className="group bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 hover:border-slate-700 rounded-xl p-3 cursor-pointer transition-all flex flex-col justify-between"
-                    >
-                      <div className="relative aspect-square w-full rounded-lg overflow-hidden mb-3 bg-slate-950">
-                        <img
-                          src={track.artworkUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300'}
-                          alt={track.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                        <button
-                          type="button"
-                          className="absolute bottom-2 right-2 w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                          style={{ backgroundColor: accentColor }}
-                        >
-                          <Play className="w-4 h-4 fill-slate-950 text-slate-950 ml-0.5" />
-                        </button>
-                      </div>
+        {activeTab === 'recommendations' && (
+          <RecommendationsView
+            activity={recActivity}
+            character={recCharacter}
+            mood={recMood}
+            language={recLanguage}
+            recommendations={recommendations}
+            similarSeedTrack={similarSeedTrack}
+            similarTracks={similarTracks}
+            feedbackStatus={feedbackStatus}
+            onModeChange={(axis, val) => {
+              if (axis === 'activity') setRecActivity(val);
+              if (axis === 'character') setRecCharacter(val);
+              if (axis === 'mood') setRecMood(val);
+              if (axis === 'language') setRecLanguage(val);
+            }}
+            onSelectTrackToPlay={(track) => {
+              handleSelectTrack(track);
+              setActiveTab('catalog');
+            }}
+            onInspectSimilarForTrack={loadSimilarTracks}
+            onSubmitFeedback={async (track, type) => {
+              const res = await authFetch('/api/v1/recommendations/feedback', {
+                method: 'POST',
+                body: JSON.stringify({
+                  trackId: track.id,
+                  provider: track.provider,
+                  artistId: track.artistId,
+                  feedbackType: type,
+                  activityMode: recActivity,
+                  characterMode: recCharacter,
+                  moodMode: recMood,
+                  languageMode: recLanguage,
+                }),
+              });
+              if (res.ok) {
+                setFeedbackStatus(
+                  `Обратная связь «${type}» для «${track.title}» сохранена в D1. Выдача пересчитана.`
+                );
+                await loadRecommendations(recActivity, recCharacter, recMood, recLanguage);
+              }
+            }}
+          />
+        )}
 
-                      <div>
-                        <div
-                          className={`text-xs font-semibold truncate ${
-                            isCurrent ? 'text-blue-400' : 'text-slate-200'
-                          }`}
-                        >
-                          {track.title}
-                        </div>
-                        <div className="text-[11px] text-slate-400 truncate mt-0.5">
-                          {track.artist}
-                        </div>
-                        <div className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider font-mono">
-                          {track.provider}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+        {activeTab === 'library' && (
+          <LibrarySyncView
+            playlists={playlists}
+            favorites={favorites}
+            history={history}
+            currentUser={currentUser}
+            sharedPlaylistPreview={sharedPlaylistPreview}
+            libraryNotice={libraryNotice}
+            onCreatePlaylist={async (title, description, isPublic) => {
+              const res = await authFetch('/api/v1/playlists', {
+                method: 'POST',
+                body: JSON.stringify({ title, description, isPublic }),
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                setLibraryNotice(`Ошибка ${res.status} (${data.error?.code}): ${data.error?.message}`);
+              } else {
+                setLibraryNotice(`Плейлист «${title}» создан в D1.`);
+                await loadUserLibraryAndState();
+              }
+            }}
+            onDeletePlaylist={async (playlistId) => {
+              const res = await authFetch(`/api/v1/playlists/${encodeURIComponent(playlistId)}`, {
+                method: 'DELETE',
+              });
+              if (res.ok) {
+                setLibraryNotice('Плейлист удалён.');
+                await loadUserLibraryAndState();
+              }
+            }}
+            onSharePlaylist={async (playlistId) => {
+              const res = await authFetch(
+                `/api/v1/playlists/${encodeURIComponent(playlistId)}/share`,
+                { method: 'POST' }
+              );
+              const data = await res.json();
+              if (res.ok) {
+                setLibraryNotice(
+                  `Создана публичная ссылка: ${data.publicApiUrl} (shareId: ${data.shareId})`
+                );
+                await loadUserLibraryAndState();
+                const pubRes = await fetch(data.publicApiUrl);
+                if (pubRes.ok) {
+                  setSharedPlaylistPreview(await pubRes.json());
+                }
+              }
+            }}
+            onInspectSharedPlaylist={async (shareId) => {
+              const pubRes = await fetch(`/api/v1/playlists/public/${encodeURIComponent(shareId)}`);
+              if (pubRes.ok) {
+                setSharedPlaylistPreview(await pubRes.json());
+              }
+            }}
+            onRemoveFavorite={async (trackId) => {
+              await authFetch(`/api/v1/library/favorites/${encodeURIComponent(trackId)}`, {
+                method: 'DELETE',
+              });
+              await loadUserLibraryAndState();
+            }}
+            onClearHistory={async () => {
+              await authFetch('/api/v1/history', { method: 'DELETE' });
+              setLibraryNotice('История прослушиваний очищена.');
+              await loadUserLibraryAndState();
+            }}
+            onUpdateUsername={async (newUsername) => {
+              const res = await authFetch('/api/v1/users/me', {
+                method: 'PATCH',
+                body: JSON.stringify({ username: newUsername }),
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                setLibraryNotice(`HTTP ${res.status} (${data.error?.code}): ${data.error?.message}`);
+              } else {
+                setLibraryNotice(
+                  `Никнейм успешно изменён на @${data.user.username}. Следующая смена будет доступна через 7 дней.`
+                );
+                await loadUserLibraryAndState();
+              }
+            }}
+            onAttemptSelfRoleEscalation={async () => {
+              const res = await authFetch('/api/v1/users/me', {
+                method: 'PATCH',
+                body: JSON.stringify({ role: 'admin' }),
+              });
+              const data = await res.json();
+              setLibraryNotice(`HTTP ${res.status} (${data.error?.code}): ${data.error?.message}`);
+            }}
+          />
+        )}
 
-          {/* Tab 2: Search */}
-          {activeTab === 'search' && (
-            <div className="space-y-4">
-              <div className="relative max-w-lg">
-                <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Искать треки, альбомы, исполнителей..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-blue-500"
-                />
-              </div>
+        {activeTab === 'workbench' && (
+          <ApiAuditWorkbenchView
+            accessToken={currentToken}
+            defaultShareId={defaultShareId}
+            healthInfo={healthInfo}
+          />
+        )}
 
-              <div className="divide-y divide-slate-800/80">
-                {tracks
-                  .filter((t) =>
-                    !searchQuery
-                      ? true
-                      : t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        t.artist.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
-                  .map((track) => (
-                    <div
-                      key={track.id}
-                      onClick={() => {
-                        setCurrentTrack(track);
-                        setIsPlaying(true);
-                      }}
-                      className="py-2.5 px-3 hover:bg-slate-900/60 rounded-lg flex items-center justify-between cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={track.artworkUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=80'}
-                          alt={track.title}
-                          className="w-10 h-10 rounded-md object-cover"
-                        />
-                        <div>
-                          <div className="text-xs font-semibold text-slate-200">
-                            {track.title}
-                          </div>
-                          <div className="text-[11px] text-slate-400">
-                            {track.artist} · {track.provider}
-                          </div>
-                        </div>
-                      </div>
+        {activeTab === 'admin' && (
+          <AdminConsoleView
+            statistics={adminStats}
+            usersList={adminUsers}
+            errorLogs={adminErrors}
+            systemSettings={adminSettings}
+            currentUserId={currentUser?.id || ''}
+            adminNotice={adminNotice}
+            onUpdateUserRole={async (userId, role) => {
+              const res = await authFetch(`/api/v1/admin/users/${encodeURIComponent(userId)}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ role }),
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                setAdminNotice(`HTTP ${res.status} (${data.error?.code}): ${data.error?.message}`);
+              } else {
+                setAdminNotice(
+                  `Роль пользователя @${data.user.username} обновлена на «${data.user.role}».`
+                );
+                await loadAdminTelemetry();
+              }
+            }}
+            onUpdateSystemSetting={async (key, value) => {
+              const res = await authFetch('/api/v1/admin/settings', {
+                method: 'PATCH',
+                body: JSON.stringify({ key, value }),
+              });
+              const data = await res.json();
+              if (res.ok) {
+                setAdminNotice(
+                  `Системная настройка «${data.setting.key}» обновлена (v${data.setting.version}).`
+                );
+                await loadAdminTelemetry();
+              }
+            }}
+          />
+        )}
+      </main>
 
-                      <div className="text-xs font-mono text-slate-500">
-                        {Math.floor(track.durationSeconds / 60)}:
-                        {String(track.durationSeconds % 60).padStart(2, '0')}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {/* Tab 3: Playlists (Max 10) */}
-          {activeTab === 'playlists' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-bold text-white">
-                    Плейлисты ({playlists.length}/10)
-                  </h2>
-                  <p className="text-xs text-slate-400">
-                    Ограничение бизнес-логики: не более 10 плейлистов на аккаунт в Cloudflare D1
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  disabled={playlists.length >= 10}
-                  onClick={() => {
-                    const newPl: Playlist = {
-                      id: `pl_${Date.now()}`,
-                      userId: 'usr_sanchez',
-                      title: `Плейлист #${playlists.length + 1}`,
-                      isPublic: false,
-                      tracksCount: 0,
-                      createdAt: new Date().toISOString(),
-                      updatedAt: new Date().toISOString(),
-                    };
-                    setPlaylists((prev) => [...prev, newPl]);
-                  }}
-                  className="px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 text-slate-950"
-                  style={{ backgroundColor: accentColor }}
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Создать плейлист</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                {playlists.map((pl) => (
-                  <div
-                    key={pl.id}
-                    className="p-4 bg-slate-900 border border-slate-800 rounded-xl space-y-2"
-                  >
-                    <div className="text-sm font-semibold text-white">{pl.title}</div>
-                    <div className="text-xs text-slate-400">
-                      {pl.tracksCount} треков · {pl.isPublic ? 'Публичный' : 'Приватный'}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Tab 4: Profile & Settings */}
-          {activeTab === 'profile' && (
-            <div className="max-w-xl space-y-6">
-              <div>
-                <h2 className="text-lg font-bold text-white">Профиль и оформление</h2>
-                <p className="text-xs text-slate-400">
-                  Настройки Windows Desktop клиента и выбор акцентного цвета
-                </p>
-              </div>
-
-              <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl space-y-3">
-                <div className="text-xs font-semibold text-slate-300">
-                  Акцентный цвет оформления
-                </div>
-                <div className="flex gap-3">
-                  {[
-                    { label: 'Синий', color: '#2563eb' },
-                    { label: 'Циан', color: '#06b6d4' },
-                    { label: 'Изумруд', color: '#10b981' },
-                    { label: 'Фиолетовый', color: '#8b5cf6' },
-                    { label: 'Янтарь', color: '#f59e0b' },
-                    { label: 'Роза', color: '#f43f5e' },
-                  ].map((c) => (
-                    <button
-                      key={c.color}
-                      type="button"
-                      onClick={() => setAccentColor(c.color)}
-                      className={`w-8 h-8 rounded-full border-2 transition-transform ${
-                        accentColor === c.color
-                          ? 'border-white scale-110'
-                          : 'border-transparent'
-                      }`}
-                      style={{ backgroundColor: c.color }}
-                      title={c.label}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl space-y-2 text-xs font-mono">
-                <div className="text-slate-400">API Endpoint:</div>
-                <div className="text-slate-200 break-all">{API_BASE_URL}</div>
-              </div>
-            </div>
-          )}
-        </main>
-      </div>
-
-      {/* 3. Bottom Playback Panel */}
-      <DesktopMiniPlayer
-        currentTrack={currentTrack}
-        isPlaying={isPlaying}
-        positionMs={positionMs}
-        durationMs={(currentTrack?.durationSeconds || 180) * 1000}
-        volume={volume}
-        isShuffle={isShuffle}
-        isRepeat={isRepeat}
-        isFavorite={currentTrack ? favorites.has(currentTrack.id) : false}
-        accentColor={accentColor}
-        onPlayPause={() => setIsPlaying((p) => !p)}
-        onNext={handleNext}
-        onPrev={handlePrev}
-        onSeek={setPositionMs}
-        onVolumeChange={setVolume}
-        onToggleShuffle={() => setIsShuffle((s) => !s)}
-        onToggleRepeat={() => setIsRepeat((r) => !r)}
-        onToggleFavorite={() => currentTrack && toggleFavorite(currentTrack.id)}
-        onOpenFullScreen={() => setIsFullScreen(true)}
-      />
-
-      {/* 4. FullScreen Modal Player */}
-      {isFullScreen && currentTrack && (
-        <DesktopFullScreenPlayer
-          track={currentTrack}
-          isPlaying={isPlaying}
-          positionMs={positionMs}
-          durationMs={(currentTrack.durationSeconds || 180) * 1000}
-          isShuffle={isShuffle}
-          isRepeat={isRepeat}
-          isFavorite={favorites.has(currentTrack.id)}
-          accentColor={accentColor}
-          onPlayPause={() => setIsPlaying((p) => !p)}
-          onNext={handleNext}
-          onPrev={handlePrev}
-          onSeek={setPositionMs}
-          onToggleShuffle={() => setIsShuffle((s) => !s)}
-          onToggleRepeat={() => setIsRepeat((r) => !r)}
-          onToggleFavorite={() => toggleFavorite(currentTrack.id)}
-          onRecommendSimilar={() => {}}
-          onClose={() => setIsFullScreen(false)}
-        />
-      )}
-
-      {/* 5. Hotkeys Configuration Modal */}
-      {isHotkeyModalOpen && (
-        <HotkeyConfigModal
-          config={hotkeys}
-          onSave={setHotkeys}
-          onClose={() => setIsHotkeyModalOpen(false)}
-        />
-      )}
+      {/* Clean Footer */}
+      <footer className="border-t border-slate-800/80 py-5 px-6 text-xs text-slate-400">
+        <div className="max-w-[1380px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+          <span>
+            PohuMusic Backend · Cloudflare Workers + TypeScript + Hono + D1 + KV + Workers Static Assets
+          </span>
+          <div className="flex items-center gap-4">
+            <a
+              href="/api/v1/openapi.json"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-amber-400 transition-colors"
+            >
+              OpenAPI 3.1.0 JSON
+            </a>
+            <a
+              href="/api/v1/health"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-amber-400 transition-colors"
+            >
+              Health & D1 Schema
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
+
+export default App;
