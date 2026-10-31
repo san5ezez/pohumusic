@@ -333,7 +333,7 @@ export const ClientAppsShowroomView: React.FC<ClientAppsShowroomViewProps> = ({
                           {track.title}
                         </div>
                         <div className="text-[11px] text-slate-400 truncate">
-                          {track.artist}
+                          {track.artistName}
                         </div>
                       </div>
                     </div>
@@ -357,7 +357,7 @@ export const ClientAppsShowroomView: React.FC<ClientAppsShowroomViewProps> = ({
                   {activeTrack.title}
                 </div>
                 <div className="text-[11px] text-slate-400 truncate">
-                  {activeTrack.artist}
+                  {activeTrack.artistName}
                 </div>
               </div>
               <button
@@ -407,7 +407,7 @@ export const ClientAppsShowroomView: React.FC<ClientAppsShowroomViewProps> = ({
                 <input
                   type="range"
                   min={0}
-                  max={(activeTrack?.durationSeconds || 180) * 1000}
+                  max={activeTrack?.durationMs || 180000}
                   value={positionMs}
                   onChange={(e) => setPositionMs(Number(e.target.value))}
                   className="flex-1 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
@@ -516,7 +516,7 @@ export const ClientAppsShowroomView: React.FC<ClientAppsShowroomViewProps> = ({
                           {track.title}
                         </div>
                         <div className="text-[10px] text-slate-400 truncate w-40">
-                          {track.artist}
+                          {track.artistName}
                         </div>
                       </div>
                     </div>
@@ -546,7 +546,7 @@ export const ClientAppsShowroomView: React.FC<ClientAppsShowroomViewProps> = ({
                     {activeTrack.title}
                   </div>
                   <div className="text-[9px] text-slate-400 truncate w-32">
-                    {activeTrack.artist}
+                    {activeTrack.artistName}
                   </div>
                 </div>
               </div>

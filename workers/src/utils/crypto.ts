@@ -116,7 +116,7 @@ export async function verifyPassword(password: string, storedHash: string, peppe
     const derivedBits = await crypto.subtle.deriveBits(
       {
         name: 'PBKDF2',
-        salt,
+        salt: salt as unknown as BufferSource,
         iterations,
         hash: 'SHA-512',
       },
@@ -191,7 +191,7 @@ export async function verifyJwt(token: string, secret: string): Promise<JwtPaylo
     const isValid = await crypto.subtle.verify(
       'HMAC',
       key,
-      signatureBytes,
+      signatureBytes as unknown as BufferSource,
       encoder.encode(signingInput)
     );
     if (!isValid) return null;

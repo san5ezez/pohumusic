@@ -703,7 +703,8 @@ authRouter.get('/me', requireAuthMiddleware, async (c) => {
 
 // GET /api/v1/auth/oauth/:provider/start (State-protected OAuth 2.0 initiation for Google & Discord)
 authRouter.get('/oauth/:provider/start', authRateLimit, async (c) => {
-  const provider = c.req.param('provider').toLowerCase();
+  const providerParam = c.req.param('provider');
+  const provider = (providerParam || '').toLowerCase();
   if (provider !== 'google' && provider !== 'discord') {
     throw new ApiError(400, 'UNSUPPORTED_OAUTH_PROVIDER', 'Supported OAuth providers: google, discord.');
   }
@@ -1195,7 +1196,8 @@ authRouter.get('/oauth/:provider/callback', async (c) => {
 
 // POST /api/v1/auth/oauth/:provider/callback (API client code exchange)
 authRouter.post('/oauth/:provider/callback', authRateLimit, async (c) => {
-  const provider = c.req.param('provider').toLowerCase();
+  const providerParam = c.req.param('provider');
+  const provider = (providerParam || '').toLowerCase();
   if (provider !== 'google' && provider !== 'discord') {
     throw new ApiError(400, 'UNSUPPORTED_OAUTH_PROVIDER', 'Supported OAuth providers: google, discord.');
   }
