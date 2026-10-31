@@ -187,17 +187,17 @@ class PlaybackManager(private val context: Context) {
         }.start()
     }
 
-    fun toggleEqualizer(enabled: Boolean) {
+    fun toggleEqualizer(isEnabled: Boolean) {
         val sessionId = exoPlayer?.audioSessionId ?: return
         try {
-            if (equalizer == null && enabled) {
+            if (equalizer == null && isEnabled) {
                 equalizer = Equalizer(0, sessionId).apply {
-                    enabled = true
+                    setEnabled(true)
                 }
             } else {
-                equalizer?.enabled = enabled
+                equalizer?.setEnabled(isEnabled)
             }
-            _uiState.value = _uiState.value.copy(isEqualizerEnabled = enabled)
+            _uiState.value = _uiState.value.copy(isEqualizerEnabled = isEnabled)
         } catch (e: Exception) {
             _uiState.value = _uiState.value.copy(isEqualizerEnabled = false)
         }
