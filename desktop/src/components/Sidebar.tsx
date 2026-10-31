@@ -7,8 +7,9 @@ import {
   ListMusic,
   History,
   Keyboard,
-  User as UserIcon,
+  LogIn,
 } from 'lucide-react';
+import type { User } from '../types';
 
 interface SidebarProps {
   activeTab: string;
@@ -16,6 +17,8 @@ interface SidebarProps {
   accentColor: string;
   onOpenHotkeys: () => void;
   playlistsCount: number;
+  currentUser: User | null;
+  onOpenAuthModal: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -24,6 +27,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   accentColor,
   onOpenHotkeys,
   playlistsCount,
+  currentUser,
+  onOpenAuthModal,
 }) => {
   const mainNav = [
     { id: 'home', label: 'Главная', icon: Home },
@@ -95,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Bottom Shortcuts & Profile Card */}
+      {/* Bottom Shortcuts & Profile / Auth Card */}
       <div className="pt-3 border-t border-slate-800/80 space-y-2">
         <button
           type="button"
@@ -106,19 +111,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span>Горячие клавиши</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => onTabChange('profile')}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-slate-900/60 transition-colors"
-        >
-          <div className="w-6 h-6 rounded-full bg-blue-600/30 flex items-center justify-center text-blue-400 text-xs font-bold">
-            <UserIcon className="w-3.5 h-3.5" />
+        {currentUser ? (
+          <button
+            type="button"
+            onClick={() => onTabChange('profile')}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-colors ${
+              activeTab === 'profile'
+                ? 'bg-slate-800/80 text-white'
+                : 'text-slate-300 hover:bg-slate-900/60'
+            }`}
+          >
+            <div
+              className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+              style={{ backgroundColor: accentColor }}
+            >
+              {currentUser.displayName ? currentUser.displayName[0].toUpperCase() : 'U'}
+            </div>
+            <div className="text-left truncate">
+              <div className="font-semibold text-slate-200 truncate">
+                {currentUser.displayName || currentUser.username}
+              </div>
+              <div className="text-[10px] text-slate-500 truncate">@{currentUser.username}</div>
+            </div>
+          </button>
+        ) : (
+          <div className="space-y-1.5">
+            <button
+              type="button"
+              onClick={onOpenAuthModal}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold text-white shadow-lg transition-transform active:scale-95"
+              style={{ backgroundColor: accentColor }}
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Войти / Регистрация</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onTabChange('profile')}
+              className="w-full text-center text-[10px] text-slate-500 hover:text-slate-400 py-1 transition-colors"
+            >
+              Настройки приложения
+            </button>
           </div>
-          <div className="text-left truncate">
-            <div className="font-semibold text-slate-200 truncate">Профиль</div>
-            <div className="text-[10px] text-slate-500 truncate">@sanchez_admin</div>
-          </div>
-        </button>
+        )}
       </div>
     </aside>
   );

@@ -308,19 +308,13 @@ export const ApiAuditWorkbenchView: React.FC<ApiAuditWorkbenchViewProps> = ({
             <div className="space-y-1">
               <span className="text-slate-400 block font-sans text-[11px]">Для Google OAuth (Authorized redirect URIs):</span>
               <div className="p-2 bg-slate-900 border border-slate-800 rounded text-amber-300 break-all select-all text-[11px]">
-                https://ais-dev-3ze7grpwzhpgtjzyhrq2t4-191765606642.asia-southeast1.run.app/api/v1/auth/oauth/google/callback
-              </div>
-              <div className="p-2 bg-slate-900 border border-slate-800 rounded text-slate-300 break-all select-all text-[11px]">
-                https://ais-pre-3ze7grpwzhpgtjzyhrq2t4-191765606642.asia-southeast1.run.app/api/v1/auth/oauth/google/callback
+                https://pohumusic-backend.4g-2551.workers.dev/api/v1/auth/oauth/google/callback
               </div>
             </div>
             <div className="space-y-1">
               <span className="text-slate-400 block font-sans text-[11px]">Для Discord OAuth (Redirects):</span>
               <div className="p-2 bg-slate-900 border border-slate-800 rounded text-indigo-300 break-all select-all text-[11px]">
-                https://ais-dev-3ze7grpwzhpgtjzyhrq2t4-191765606642.asia-southeast1.run.app/api/v1/auth/oauth/discord/callback
-              </div>
-              <div className="p-2 bg-slate-900 border border-slate-800 rounded text-slate-300 break-all select-all text-[11px]">
-                https://ais-pre-3ze7grpwzhpgtjzyhrq2t4-191765606642.asia-southeast1.run.app/api/v1/auth/oauth/discord/callback
+                https://pohumusic-backend.4g-2551.workers.dev/api/v1/auth/oauth/discord/callback
               </div>
             </div>
           </div>

@@ -9,6 +9,7 @@ import { LibrarySyncView } from './components/LibrarySyncView';
 import { ApiAuditWorkbenchView } from './components/ApiAuditWorkbenchView';
 import { AdminConsoleView } from './components/AdminConsoleView';
 import { ClientAppsShowroomView } from './components/ClientAppsShowroomView';
+import { AuthModal } from './components/AuthModal';
 import type {
   PlaybackInfo,
   PlayerDeviceSession,
@@ -21,13 +22,27 @@ type ActiveTab = 'catalog' | 'recommendations' | 'library' | 'workbench' | 'admi
 export function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('catalog');
 
-  // Demo Session Tokens (Admin vs Listener)
+  // User Authentication State
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem('pohumusic_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [userToken, setUserToken] = useState<string | null>(() => {
+    return localStorage.getItem('pohumusic_access_token');
+  });
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Demo Session Tokens (for testing workbench)
   const [adminToken, setAdminToken] = useState<string>('');
   const [listenerToken, setListenerToken] = useState<string>('');
   const [activeRoleMode, setActiveRoleMode] = useState<'admin' | 'user'>('admin');
   const [defaultShareId, setDefaultShareId] = useState<string>('pohuNight26');
 
-  const currentToken = activeRoleMode === 'admin' ? adminToken : listenerToken;
+  const currentToken = userToken || (activeRoleMode === 'admin' ? adminToken : listenerToken);
 
   // Catalog & Player state
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -54,7 +69,6 @@ export function App() {
   const [playlists, setPlaylists] = useState<Array<any>>([]);
   const [favorites, setFavorites] = useState<Array<any>>([]);
   const [history, setHistory] = useState<Array<any>>([]);
-  const [currentUser, setCurrentUser] = useState<any>(null);
   const [sharedPlaylistPreview, setSharedPlaylistPreview] = useState<Record<string, any> | null>(
     null
   );
@@ -191,21 +205,65 @@ export function App() {
     }
   }, [authFetch, currentToken, activeRoleMode]);
 
+  const handleAuthSuccess = (user: any, access: string, refresh: string) => {
+    setCurrentUser(user);
+    setUserToken(access);
+    try {
+      localStorage.setItem('pohumusic_user', JSON.stringify(user));
+      localStorage.setItem('pohumusic_access_token', access);
+      localStorage.setItem('pohumusic_refresh_token', refresh);
+    } catch {}
+    setLibraryNotice(`Успешный вход: @${user.username}`);
+  };
+
+  const handleLogout = async () => {
+    if (userToken) {
+      try {
+        await fetch('/api/v1/auth/logout', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${userToken}` },
+        });
+      } catch {}
+    }
+    setCurrentUser(null);
+    setUserToken(null);
+    setPlaylists([]);
+    setFavorites([]);
+    try {
+      localStorage.removeItem('pohumusic_user');
+      localStorage.removeItem('pohumusic_access_token');
+      localStorage.removeItem('pohumusic_refresh_token');
+    } catch {}
+  };
+
   // Initial bootstrap
   useEffect(() => {
     async function init() {
-      const [demoRes, healthRes] = await Promise.all([
-        fetch('/api/v1/demo-session'),
-        fetch('/api/v1/health'),
-      ]);
+      const healthRes = await fetch('/api/v1/health');
       if (healthRes.ok) {
         setHealthInfo(await healthRes.json());
       }
-      if (demoRes.ok) {
-        const demo = await demoRes.json();
-        setAdminToken(demo.adminAccessToken);
-        setListenerToken(demo.listenerAccessToken);
-        setDefaultShareId(demo.defaultShareId || 'pohuNight26');
+
+      const savedToken = localStorage.getItem('pohumusic_access_token');
+      if (savedToken) {
+        try {
+          const meRes = await fetch('/api/v1/auth/me', {
+            headers: { Authorization: `Bearer ${savedToken}` },
+          });
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            setCurrentUser(meData.user);
+            setUserToken(savedToken);
+          } else if (meRes.status === 401) {
+            handleLogout();
+          }
+        } catch {}
+      } else {
+        const demoRes = await fetch('/api/v1/demo-session');
+        if (demoRes.ok) {
+          const demo = await demoRes.json();
+          setDefaultShareId(demo.defaultShareId || 'pohuNight26');
+        }
       }
     }
     init();
@@ -413,19 +471,47 @@ export function App() {
           ))}
         </nav>
 
-        {/* Zone 3: 1 primary action button */}
-        <div className="flex items-center shrink-0">
-          <button
-            type="button"
-            onClick={() =>
-              setActiveRoleMode((prev) => (prev === 'admin' ? 'user' : 'admin'))
-            }
-            className="px-4 py-2 text-xs font-semibold text-slate-950 bg-amber-500 hover:bg-amber-400 rounded-lg transition-colors whitespace-nowrap shrink-0"
-          >
-            {activeRoleMode === 'admin'
-              ? 'Сессия: Admin (@sanchez_admin)'
-              : 'Сессия: User (@nikita_wave)'}
-          </button>
+        {/* Zone 3: Authentication / User State */}
+        <div className="flex items-center gap-3 shrink-0">
+          {currentUser ? (
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => handleTabSwitch('library')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors text-xs text-slate-200"
+              >
+                <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-[10px] font-bold text-white">
+                  {currentUser.displayName ? currentUser.displayName[0].toUpperCase() : 'U'}
+                </div>
+                <span>@{currentUser.username}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-red-400 hover:bg-slate-900 rounded-lg transition-colors"
+                title="Выйти из аккаунта"
+              >
+                Выйти
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAuthModalOpen(true)}
+                className="px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg transition-colors"
+              >
+                Войти
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAuthModalOpen(true)}
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg shadow-md transition-colors"
+              >
+                Регистрация
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -676,6 +762,13 @@ export function App() {
           </div>
         </div>
       </footer>
+
+      {/* Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthSuccess={handleAuthSuccess}
+      />
     </div>
   );
 }

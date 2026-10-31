@@ -20,7 +20,7 @@ android {
             useSupportLibrary = true
         }
 
-        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://ais-dev-3ze7grpwzhpgtjzyhrq2t4-191765606642.asia-southeast1.run.app/api/v1\"")
+        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://pohumusic-backend.4g-2551.workers.dev/api/v1\"")
     }
 
     buildTypes {
