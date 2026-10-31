@@ -128,28 +128,20 @@ jobs:
         with:
           workspaces: desktop/src-tauri -> target
 
-      - name: Install Desktop dependencies
-        working-directory: desktop
-        run: npm install
-
       - name: Build Desktop Frontend
-        working-directory: desktop
-        run: npm run build
+        run: |
+          cd desktop
+          npm install
+          npm run build
 
       - name: Build Windows Tauri Bundle (.exe)
-        uses: tauri-apps/tauri-action@v0
+        run: |
+          cd desktop
+          npx tauri build --ignore-version-mismatches
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_CLI_NO_VERSION_CHECK: "true"
           TAURI_SKIP_VERSION_CHECK: "true"
-        with:
-          projectPath: desktop
-          tagName: v__VERSION__
-          releaseName: 'PohuMusic v__VERSION__'
-          releaseBody: 'PohuMusic Windows Desktop & Android Release'
-          releaseDraft: false
-          prerelease: false
-          args: --ignore-version-mismatches
 
       - name: Upload Windows Executables
         uses: actions/upload-artifact@v4

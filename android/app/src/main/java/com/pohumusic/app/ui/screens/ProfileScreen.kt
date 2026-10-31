@@ -200,7 +200,7 @@ fun ProfileScreen(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Icon(Icons.Filled.Logout, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
                 Text("Выйти")
             }
