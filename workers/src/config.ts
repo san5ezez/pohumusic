@@ -149,7 +149,7 @@ export function getGoogleOAuthCredentials(env: Env): { clientId: string; clientS
 export function getDiscordOAuthCredentials(env: Env): { clientId: string; clientSecret: string } {
   return {
     clientId: env.DISCORD_CLIENT_ID || '1565970971511357440',
-    clientSecret: env.DISCORD_CLIENT_SECRET || 'Ynp4zTqs8Uy-wzyRnG9g3Q--0aJBKWQA',
+    clientSecret: env.DISCORD_CLIENT_SECRET || 'Ynp4zTqs8Uy-wzyRnG9g3Q--OaJBKWQA',
   };
 }
 
