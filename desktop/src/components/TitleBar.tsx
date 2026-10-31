@@ -47,9 +47,28 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     } catch (_: unknown) {}
   };
 
+  const handleMouseDown = async (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest('button, .no-drag')) return;
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      await getCurrentWindow().startDragging();
+    } catch (_: unknown) {}
+  };
+
+  const handleDoubleClick = async (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button, .no-drag')) return;
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      await getCurrentWindow().toggleMaximize();
+    } catch (_: unknown) {}
+  };
+
   return (
     <div
       data-tauri-drag-region
+      onMouseDown={handleMouseDown}
+      onDoubleClick={handleDoubleClick}
       className="h-10 bg-[#070b13] border-b border-slate-800/80 flex items-center justify-between select-none z-50 text-slate-300 px-3 cursor-move shrink-0"
     >
       {/* Wordmark and draggable area */}

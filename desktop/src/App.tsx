@@ -100,6 +100,7 @@ export function App() {
   // Library state
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [recommendationMode, setRecommendationMode] = useState('working');
 
@@ -199,8 +200,8 @@ export function App() {
         const data = await res.json();
         const list = ((data.tracks || []) as any[]).map(normalizeTrack);
         setTracks(list);
-        if (list.length > 0 && !currentTrack) {
-          setCurrentTrack(list[0]);
+        if (list.length > 0) {
+          setCurrentTrack((prev) => prev ?? list[0]);
         }
       }
 
@@ -212,7 +213,7 @@ export function App() {
     } finally {
       setTimeout(() => setIsLoading(false), 300);
     }
-  }, [currentTrack, accessToken, loadUserData]);
+  }, [accessToken, loadUserData]);
 
   useEffect(() => {
     loadInitialData();
@@ -220,7 +221,10 @@ export function App() {
 
   // Debounced search against Cloudflare Workers API
   useEffect(() => {
-    if (!searchQuery.trim()) {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setSearchResults([]);
+      setIsSearching(false);
       return;
     }
 
@@ -228,29 +232,22 @@ export function App() {
       try {
         setIsSearching(true);
         const res = await fetch(
-          `${API_BASE_URL}/tracks/search?q=${encodeURIComponent(searchQuery.trim())}&limit=50`
+          `${API_BASE_URL}/tracks/search?q=${encodeURIComponent(trimmed)}&limit=50`
         );
         if (res.ok) {
           const data = await res.json();
           const list = ((data.tracks || []) as any[]).map(normalizeTrack);
-          setTracks(list);
+          setSearchResults(list);
         }
       } catch (e) {
         console.error('Failed to search tracks', e);
       } finally {
         setIsSearching(false);
       }
-    }, 250);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
-
-  // When search query is cleared, reset to catalog
-  useEffect(() => {
-    if (searchQuery === '') {
-      loadInitialData();
-    }
-  }, [searchQuery, loadInitialData]);
 
   // In-focus hotkey listeners (Only active when window has focus)
   useEffect(() => {
@@ -285,21 +282,24 @@ export function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [hotkeys, tracks, currentTrack]);
 
+  const currentQueue =
+    activeTab === 'search' && searchResults.length > 0 ? searchResults : tracks;
+
   const handleNext = () => {
-    if (!currentTrack || tracks.length === 0) return;
-    const idx = tracks.findIndex((t) => t.id === currentTrack.id);
-    if (idx !== -1 && idx + 1 < tracks.length) {
-      setCurrentTrack(tracks[idx + 1]);
+    if (!currentTrack || currentQueue.length === 0) return;
+    const idx = currentQueue.findIndex((t) => t.id === currentTrack.id);
+    if (idx !== -1 && idx + 1 < currentQueue.length) {
+      setCurrentTrack(currentQueue[idx + 1]);
       setPositionMs(0);
       setIsPlaying(true);
     }
   };
 
   const handlePrev = () => {
-    if (!currentTrack || tracks.length === 0) return;
-    const idx = tracks.findIndex((t) => t.id === currentTrack.id);
+    if (!currentTrack || currentQueue.length === 0) return;
+    const idx = currentQueue.findIndex((t) => t.id === currentTrack.id);
     if (idx > 0) {
-      setCurrentTrack(tracks[idx - 1]);
+      setCurrentTrack(currentQueue[idx - 1]);
       setPositionMs(0);
       setIsPlaying(true);
     }
@@ -400,14 +400,7 @@ export function App() {
     }
   };
 
-  const filteredTracks = tracks.filter((t) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    const titleMatch = (t.title || '').toLowerCase().includes(q);
-    const artistMatch = (t.artist || t.artistName || '').toLowerCase().includes(q);
-    const albumMatch = (t.album || t.albumTitle || '').toLowerCase().includes(q);
-    return titleMatch || artistMatch || albumMatch;
-  });
+  const searchList = searchQuery.trim() ? searchResults : tracks;
 
   return (
     <div className="flex flex-col h-screen w-screen bg-[#080c15] text-slate-100 select-none overflow-hidden font-sans">
@@ -481,7 +474,7 @@ export function App() {
 
               {/* Tracks Grid */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {filteredTracks.map((t) => {
+                {tracks.map((t) => {
                   const isCurrent = currentTrack?.id === t.id;
                   return (
                     <div
@@ -550,7 +543,7 @@ export function App() {
               </div>
 
               <div className="space-y-2">
-                {filteredTracks.map((t) => {
+                {searchList.map((t) => {
                   const isCurrent = currentTrack?.id === t.id;
                   const durSec = t.durationSeconds || Math.round((t.durationMs || 0) / 1000) || 0;
                   return (
@@ -596,18 +589,14 @@ export function App() {
                   );
                 })}
 
-                {!isSearching && filteredTracks.length === 0 && (
+                {!isSearching && searchQuery.trim() !== '' && searchResults.length === 0 && (
                   <div className="text-center py-16 bg-slate-900/20 border border-slate-800/40 rounded-2xl">
                     <SearchIcon className="w-10 h-10 mx-auto mb-3 text-slate-600 opacity-60" />
                     <p className="text-sm font-medium text-slate-400">
-                      {searchQuery
-                        ? `Ничего не найдено по запросу «${searchQuery}»`
-                        : 'В каталоге пока нет треков по данному фильтру'}
+                      Ничего не найдено по запросу «{searchQuery.trim()}»
                     </p>
                     <p className="text-xs text-slate-600 mt-1">
-                      {searchQuery
-                        ? 'Попробуйте ввести другое имя исполнителя или название песни'
-                        : 'Попробуйте изменить поисковый запрос'}
+                      Попробуйте ввести другое имя исполнителя или название песни
                     </p>
                   </div>
                 )}
