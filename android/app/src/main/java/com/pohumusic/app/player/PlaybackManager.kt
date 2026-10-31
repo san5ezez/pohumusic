@@ -100,11 +100,11 @@ class PlaybackManager(private val context: Context) {
         // Configure MediaItem for audio playback
         val mediaItem = MediaItem.Builder()
             .setMediaId(track.id)
-            .setUri(track.externalUrl)
+            .setUri(track.effectiveUrl)
             .setMediaMetadata(
                 MediaMetadata.Builder()
-                    .setTitle(track.title)
-                    .setArtist(track.artist)
+                    .setTitle(track.displayTitle)
+                    .setArtist(track.displayArtist)
                     .build()
             )
             .build()

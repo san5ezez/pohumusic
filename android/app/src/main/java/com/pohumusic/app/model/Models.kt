@@ -22,20 +22,40 @@ enum class AccessState {
 }
 
 data class Track(
-    val id: String,
-    val provider: ProviderSource,
-    val title: String,
-    val artist: String,
-    val album: String?,
-    val durationSeconds: Int,
-    val artworkUrl: String?,
-    val externalUrl: String,
-    val accessState: AccessState,
-    val previewSeconds: Int?,
-    val rawPlayCount: Long?,
-    val displayScore: Long?,
-    val isPlayable: Boolean = accessState == AccessState.PLAYABLE || accessState == AccessState.PREVIEW
-)
+    val id: String = "",
+    val provider: ProviderSource = ProviderSource.SOUNDCLOUD,
+    val title: String = "",
+    @SerializedName(value = "artist", alternate = ["artistName"])
+    val artist: String? = null,
+    val artistName: String? = null,
+    val album: String? = null,
+    val albumTitle: String? = null,
+    @SerializedName(value = "durationSeconds", alternate = ["durationMs"])
+    val rawDuration: Long? = 180L,
+    val durationSeconds: Int = 180,
+    val durationMs: Long? = null,
+    val artworkUrl: String? = null,
+    @SerializedName(value = "externalUrl", alternate = ["permalinkUrl"])
+    val externalUrl: String? = null,
+    val permalinkUrl: String? = null,
+    val accessState: AccessState = AccessState.PLAYABLE,
+    val previewSeconds: Int? = null,
+    val rawPlayCount: Long? = null,
+    val displayScore: Long? = null,
+    val isPlayable: Boolean = true
+) {
+    val displayArtist: String
+        get() = artist ?: artistName ?: "Неизвестный исполнитель"
+
+    val displayTitle: String
+        get() = if (title.isNotBlank()) title else "Без названия"
+
+    val displayArtworkUrl: String?
+        get() {
+            val url = artworkUrl ?: return null
+            return if (url.startsWith("http")) url else "https://pohumusic-backend.4g-2551.workers.dev${if (url.startsWith("/")) "" else "/"}$url"
+        }
+}
 
 data class PlaybackInfo(
     val trackId: String,
@@ -107,17 +127,28 @@ data class HistoryItem(
 
 data class RecommendationItem(
     val track: Track,
-    val score: Double,
-    val reason: String
-)
+    val score: Double = 0.0,
+    val reason: String? = null,
+    @SerializedName("explanationReasons")
+    val explanationReasons: List<String>? = null
+) {
+    val displayReason: String
+        get() = reason ?: explanationReasons?.firstOrNull() ?: "Рекомендация PohuMusic"
+}
 
 data class RecommendationResponse(
-    val tracks: List<RecommendationItem>,
-    val activity: String,
-    val character: String,
-    val mood: String,
-    val language: String
-)
+    @SerializedName(value = "tracks", alternate = ["recommendations"])
+    val tracks: List<RecommendationItem>? = null,
+    val recommendations: List<RecommendationItem>? = null,
+    val count: Int? = null,
+    val activity: String? = null,
+    val character: String? = null,
+    val mood: String? = null,
+    val language: String? = null
+) {
+    val items: List<RecommendationItem>
+        get() = tracks ?: recommendations ?: emptyList()
+}
 
 data class DeviceSession(
     val id: String,

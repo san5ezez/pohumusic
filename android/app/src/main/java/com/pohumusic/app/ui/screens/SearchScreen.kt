@@ -53,11 +53,16 @@ fun SearchScreen(
                             id = map["id"] as? String ?: "",
                             provider = if (map["provider"] == "soundcloud") ProviderSource.SOUNDCLOUD else ProviderSource.YOUTUBE,
                             title = map["title"] as? String ?: "Без названия",
-                            artist = map["artist"] as? String ?: "Неизвестный исполнитель",
-                            album = map["album"] as? String,
-                            durationSeconds = (map["durationSeconds"] as? Number)?.toInt() ?: 180,
+                            artist = map["artist"] as? String ?: (map["artistName"] as? String) ?: "Неизвестный исполнитель",
+                            artistName = map["artistName"] as? String,
+                            album = map["album"] as? String ?: map["albumTitle"] as? String,
+                            durationSeconds = (map["durationSeconds"] as? Number)?.toInt()
+                                ?: ((map["durationMs"] as? Number)?.toLong()?.div(1000L))?.toInt()
+                                ?: 180,
+                            durationMs = (map["durationMs"] as? Number)?.toLong(),
                             artworkUrl = map["artworkUrl"] as? String,
-                            externalUrl = map["externalUrl"] as? String ?: "",
+                            externalUrl = map["externalUrl"] as? String ?: (map["permalinkUrl"] as? String) ?: "",
+                            permalinkUrl = map["permalinkUrl"] as? String,
                             accessState = when (map["accessState"]) {
                                 "preview" -> AccessState.PREVIEW
                                 "blocked" -> AccessState.BLOCKED
@@ -179,8 +184,8 @@ fun SearchScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 AsyncImage(
-                                    model = track.artworkUrl,
-                                    contentDescription = track.title,
+                                    model = track.displayArtworkUrl,
+                                    contentDescription = track.displayTitle,
                                     modifier = Modifier
                                         .size(48.dp)
                                         .clip(RoundedCornerShape(6.dp)),
@@ -189,13 +194,13 @@ fun SearchScreen(
 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = track.title,
+                                        text = track.displayTitle,
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = "${track.artist} · ${if (track.provider == ProviderSource.SOUNDCLOUD) "SoundCloud" else "YouTube"}",
+                                        text = "${track.displayArtist} · ${if (track.provider == ProviderSource.SOUNDCLOUD) "SoundCloud" else "YouTube"}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,

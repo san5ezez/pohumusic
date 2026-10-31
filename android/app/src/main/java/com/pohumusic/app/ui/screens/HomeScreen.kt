@@ -56,7 +56,7 @@ fun HomeScreen(
             try {
                 val res = ApiClient.service.getRecommendations(activity, character, mood, language)
                 if (res.isSuccessful && res.body() != null) {
-                    tracks = res.body()!!.tracks
+                    tracks = res.body()?.items ?: emptyList()
                 } else {
                     errorText = "Не удалось загрузить рекомендации: код ${res.code()}"
                 }
@@ -233,8 +233,8 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             AsyncImage(
-                                model = track.artworkUrl,
-                                contentDescription = track.title,
+                                model = track.displayArtworkUrl,
+                                contentDescription = track.displayTitle,
                                 modifier = Modifier
                                     .size(52.dp)
                                     .clip(RoundedCornerShape(8.dp)),
@@ -243,20 +243,20 @@ fun HomeScreen(
 
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = track.title,
+                                    text = track.displayTitle,
                                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = track.artist,
+                                    text = track.displayArtist,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = item.reason,
+                                    text = item.displayReason,
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                                     color = accent
                                 )

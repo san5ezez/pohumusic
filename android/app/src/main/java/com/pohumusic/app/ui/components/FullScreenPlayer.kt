@@ -109,13 +109,13 @@ fun FullScreenPlayer(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = track.title,
+                        text = track.displayTitle,
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = track.artist,
+                        text = track.displayArtist,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

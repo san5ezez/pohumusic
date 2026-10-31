@@ -59,8 +59,8 @@ fun MiniPlayer(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 AsyncImage(
-                    model = track.artworkUrl,
-                    contentDescription = track.title,
+                    model = track.displayArtworkUrl,
+                    contentDescription = track.displayTitle,
                     modifier = Modifier
                         .size(44.dp)
                         .clip(RoundedCornerShape(8.dp)),
@@ -72,14 +72,14 @@ fun MiniPlayer(
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        text = track.title,
+                        text = track.displayTitle,
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = track.artist,
+                        text = track.displayArtist,
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
