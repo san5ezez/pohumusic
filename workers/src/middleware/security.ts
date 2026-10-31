@@ -23,20 +23,14 @@ export async function securityContextMiddleware(c: AppContext, next: Next): Prom
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
   c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 
-  // Dynamic CORS handling
+  // Dynamic CORS handling - Allow any calling client (Desktop Tauri, Android, Web, Localhost)
   const origin = c.req.header('Origin');
-  const allowedList = (c.env.ALLOWED_ORIGINS || 'http://localhost:3000,https://pohumusic.workers.dev')
-    .split(',')
-    .map((o) => o.trim())
-    .filter(Boolean);
-
   if (origin) {
-    if (allowedList.includes('*') || allowedList.includes(origin) || origin.endsWith('.run.app')) {
-      c.header('Access-Control-Allow-Origin', origin);
-      c.header('Vary', 'Origin');
-    }
+    c.header('Access-Control-Allow-Origin', origin);
+    c.header('Access-Control-Allow-Credentials', 'true');
+    c.header('Vary', 'Origin');
   } else {
-    c.header('Access-Control-Allow-Origin', allowedList[0] || '*');
+    c.header('Access-Control-Allow-Origin', '*');
   }
 
   c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');

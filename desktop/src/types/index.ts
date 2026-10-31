@@ -6,10 +6,14 @@ export interface Track {
   provider: ProviderSource;
   title: string;
   artist: string;
+  artistName?: string;
   album?: string;
+  albumTitle?: string;
   durationSeconds: number;
+  durationMs?: number;
   artworkUrl?: string;
   externalUrl: string;
+  permalinkUrl?: string;
   accessState: AccessState;
   previewSeconds?: number;
   rawPlayCount?: number;

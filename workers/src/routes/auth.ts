@@ -19,6 +19,8 @@ import {
   APP_CONSTANTS,
   getJwtAccessSecret,
   getJwtRefreshSecret,
+  getGoogleOAuthCredentials,
+  getDiscordOAuthCredentials,
   type AppVariables,
   type Env,
 } from '../config';
@@ -727,7 +729,8 @@ authRouter.get('/oauth/:provider/start', authRateLimit, async (c) => {
   );
 
   if (provider === 'google') {
-    const clientId = c.env.GOOGLE_CLIENT_ID || '';
+    const creds = getGoogleOAuthCredentials(c.env);
+    const clientId = creds.clientId;
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
       clientId
     )}&redirect_uri=${encodeURIComponent(
@@ -736,14 +739,16 @@ authRouter.get('/oauth/:provider/start', authRateLimit, async (c) => {
 
     return c.json({
       provider: 'google',
-      configured: Boolean(c.env.GOOGLE_CLIENT_ID && c.env.GOOGLE_CLIENT_SECRET),
+      configured: Boolean(creds.clientId && creds.clientSecret),
       state,
       redirectUri,
       authorizationUrl: authUrl,
+      authUrl,
     });
   }
 
-  const clientId = c.env.DISCORD_CLIENT_ID || '';
+  const creds = getDiscordOAuthCredentials(c.env);
+  const clientId = creds.clientId;
   const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(
     clientId
   )}&redirect_uri=${encodeURIComponent(
@@ -752,10 +757,11 @@ authRouter.get('/oauth/:provider/start', authRateLimit, async (c) => {
 
   return c.json({
     provider: 'discord',
-    configured: Boolean(c.env.DISCORD_CLIENT_ID && c.env.DISCORD_CLIENT_SECRET),
+    configured: Boolean(creds.clientId && creds.clientSecret),
     state,
     redirectUri,
     authorizationUrl: authUrl,
+    authUrl,
   });
 });
 
@@ -799,8 +805,9 @@ async function processOAuthExchange(
   let expiresIn = 3600;
 
   if (provider === 'google') {
-    const clientId = c.env.GOOGLE_CLIENT_ID;
-    const clientSecret = c.env.GOOGLE_CLIENT_SECRET;
+    const creds = getGoogleOAuthCredentials(c.env);
+    const clientId = creds.clientId;
+    const clientSecret = creds.clientSecret;
     if (!clientId || !clientSecret) {
       throw new ApiError(503, 'OAUTH_CREDENTIALS_NOT_CONFIGURED', 'Google OAuth credentials not configured on server.');
     }
@@ -860,8 +867,9 @@ async function processOAuthExchange(
     providerAvatarUrl = userData.picture || null;
   } else {
     // Discord
-    const clientId = c.env.DISCORD_CLIENT_ID;
-    const clientSecret = c.env.DISCORD_CLIENT_SECRET;
+    const creds = getDiscordOAuthCredentials(c.env);
+    const clientId = creds.clientId;
+    const clientSecret = creds.clientSecret;
     if (!clientId || !clientSecret) {
       throw new ApiError(503, 'OAUTH_CREDENTIALS_NOT_CONFIGURED', 'Discord OAuth credentials not configured on server.');
     }

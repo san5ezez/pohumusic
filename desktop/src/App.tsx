@@ -10,6 +10,7 @@ import { API_BASE_URL } from './config/api';
 import type { Track, HotkeyConfig, Playlist, User } from './types';
 import {
   Play,
+  Music,
   WifiOff,
   Search as SearchIcon,
   Plus,
@@ -20,6 +21,43 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';
+
+function normalizeTrack(raw: any): Track {
+  const durationSeconds =
+    typeof raw.durationSeconds === 'number'
+      ? raw.durationSeconds
+      : typeof raw.durationMs === 'number'
+      ? Math.round(raw.durationMs / 1000)
+      : 180;
+
+  const artist = raw.artist || raw.artistName || 'PohuMusic Artist';
+  const rawArtwork = raw.artworkUrl || '';
+  const artworkUrl =
+    rawArtwork && !rawArtwork.startsWith('http') && !rawArtwork.startsWith('data:')
+      ? `https://pohumusic-backend.4g-2551.workers.dev${rawArtwork.startsWith('/') ? '' : '/'}${rawArtwork}`
+      : rawArtwork;
+
+  const externalUrl = raw.externalUrl || raw.permalinkUrl || '';
+  const album = raw.album || raw.albumTitle || undefined;
+
+  return {
+    id: String(raw.id || raw.providerTrackId || Math.random().toString(36).substring(7)),
+    provider: raw.provider || 'soundcloud',
+    title: raw.title || 'Без названия',
+    artist,
+    artistName: raw.artistName || artist,
+    album,
+    albumTitle: raw.albumTitle || album,
+    durationSeconds,
+    durationMs: raw.durationMs || durationSeconds * 1000,
+    artworkUrl,
+    externalUrl,
+    permalinkUrl: raw.permalinkUrl || externalUrl,
+    accessState: raw.accessState || 'playable',
+    rawPlayCount: raw.rawPlayCount,
+    displayScore: raw.displayScore,
+  };
+}
 
 export function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -61,6 +99,7 @@ export function App() {
   // Library state
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
   const [recommendationMode, setRecommendationMode] = useState('working');
 
   // Hotkey settings
@@ -157,7 +196,7 @@ export function App() {
       const res = await fetch(`${API_BASE_URL}/tracks/search?limit=30`);
       if (res.ok) {
         const data = await res.json();
-        const list = (data.tracks || []) as Track[];
+        const list = ((data.tracks || []) as any[]).map(normalizeTrack);
         setTracks(list);
         if (list.length > 0 && !currentTrack) {
           setCurrentTrack(list[0]);
@@ -170,13 +209,47 @@ export function App() {
     } catch (_: unknown) {
       // Offline or network error handled gracefully
     } finally {
-      setTimeout(() => setIsLoading(false), 500);
+      setTimeout(() => setIsLoading(false), 300);
     }
   }, [currentTrack, accessToken, loadUserData]);
 
   useEffect(() => {
     loadInitialData();
   }, [loadInitialData]);
+
+  // Debounced search against Cloudflare Workers API
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setIsSearching(true);
+        const res = await fetch(
+          `${API_BASE_URL}/tracks/search?q=${encodeURIComponent(searchQuery.trim())}&limit=50`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const list = ((data.tracks || []) as any[]).map(normalizeTrack);
+          setTracks(list);
+        }
+      } catch (e) {
+        console.error('Failed to search tracks', e);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // When search query is cleared, reset to catalog
+  useEffect(() => {
+    if (searchQuery === '') {
+      loadInitialData();
+    }
+  }, [searchQuery, loadInitialData]);
 
   // In-focus hotkey listeners (Only active when window has focus)
   useEffect(() => {
@@ -329,11 +402,10 @@ export function App() {
   const filteredTracks = tracks.filter((t) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
-    return (
-      t.title.toLowerCase().includes(q) ||
-      t.artist.toLowerCase().includes(q) ||
-      (t.album && t.album.toLowerCase().includes(q))
-    );
+    const titleMatch = (t.title || '').toLowerCase().includes(q);
+    const artistMatch = (t.artist || t.artistName || '').toLowerCase().includes(q);
+    const albumMatch = (t.album || t.albumTitle || '').toLowerCase().includes(q);
+    return titleMatch || artistMatch || albumMatch;
   });
 
   return (
@@ -477,47 +549,81 @@ export function App() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Исполнитель, трек или альбом..."
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  className="w-full pl-10 pr-10 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
+                {isSearching && (
+                  <div className="absolute right-3.5 top-3">
+                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
-                {filteredTracks.map((t) => (
-                  <div
-                    key={t.id}
-                    onClick={() => {
-                      setCurrentTrack(t);
-                      setPositionMs(0);
-                      setIsPlaying(true);
-                    }}
-                    className="flex items-center justify-between p-3 bg-slate-900/40 hover:bg-slate-900/80 border border-slate-800/60 rounded-xl cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center gap-3 truncate">
-                      <div className="w-10 h-10 rounded-lg bg-slate-950 overflow-hidden shrink-0">
-                        {t.artworkUrl && (
-                          <img
-                            src={t.artworkUrl}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
-                        )}
-                      </div>
-                      <div className="truncate">
-                        <div className="text-xs font-semibold text-white truncate">
-                          {t.title}
+                {filteredTracks.map((t) => {
+                  const isCurrent = currentTrack?.id === t.id;
+                  const durSec = t.durationSeconds || Math.round((t.durationMs || 0) / 1000) || 0;
+                  return (
+                    <div
+                      key={t.id}
+                      onClick={() => {
+                        setCurrentTrack(t);
+                        setPositionMs(0);
+                        setIsPlaying(true);
+                      }}
+                      className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-colors ${
+                        isCurrent
+                          ? 'bg-slate-800/90 border-blue-500/50 shadow-md'
+                          : 'bg-slate-900/40 hover:bg-slate-900/80 border-slate-800/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 truncate">
+                        <div className="w-10 h-10 rounded-lg bg-slate-950 overflow-hidden shrink-0 flex items-center justify-center">
+                          {t.artworkUrl ? (
+                            <img
+                              src={t.artworkUrl}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Music className="w-5 h-5 text-slate-600" />
+                          )}
                         </div>
-                        <div className="text-[11px] text-slate-400 truncate">
-                          {t.artist}
+                        <div className="truncate">
+                          <div className={`text-xs font-semibold truncate ${isCurrent ? 'text-blue-400' : 'text-white'}`}>
+                            {t.title}
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate flex items-center gap-2">
+                            <span>{t.artist || t.artistName || 'Неизвестный исполнитель'}</span>
+                            <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
+                              {t.provider}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="text-[11px] font-mono text-slate-500">
-                      {Math.floor(t.durationSeconds / 60)}:
-                      {String(t.durationSeconds % 60).padStart(2, '0')}
+                      <div className="text-[11px] font-mono text-slate-500 shrink-0 ml-4">
+                        {Math.floor(durSec / 60)}:
+                        {String(durSec % 60).padStart(2, '0')}
+                      </div>
                     </div>
+                  );
+                })}
+
+                {!isSearching && filteredTracks.length === 0 && (
+                  <div className="text-center py-16 bg-slate-900/20 border border-slate-800/40 rounded-2xl">
+                    <SearchIcon className="w-10 h-10 mx-auto mb-3 text-slate-600 opacity-60" />
+                    <p className="text-sm font-medium text-slate-400">
+                      {searchQuery
+                        ? `Ничего не найдено по запросу «${searchQuery}»`
+                        : 'В каталоге пока нет треков по данному фильтру'}
+                    </p>
+                    <p className="text-xs text-slate-600 mt-1">
+                      {searchQuery
+                        ? 'Попробуйте ввести другое имя исполнителя или название песни'
+                        : 'Попробуйте изменить поисковый запрос'}
+                    </p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           )}

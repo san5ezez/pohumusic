@@ -136,3 +136,23 @@ export function getJwtAccessSecret(env: Env): string {
 export function getJwtRefreshSecret(env: Env): string {
   return env.JWT_REFRESH_SECRET || 'pohumusic-dev-refresh-secret-key-minimum-32-bytes-2026';
 }
+
+export function getGoogleOAuthCredentials(env: Env): { clientId: string; clientSecret: string } {
+  return {
+    clientId:
+      env.GOOGLE_CLIENT_ID ||
+      '750365132799-2fg0f63sar4aqqppnru3l7e4e2d8cnrg.apps.googleusercontent.com',
+    clientSecret: env.GOOGLE_CLIENT_SECRET || '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',
+  };
+}
+
+export function getDiscordOAuthCredentials(env: Env): { clientId: string; clientSecret: string } {
+  return {
+    clientId: env.DISCORD_CLIENT_ID || '1565970971511357440',
+    clientSecret: env.DISCORD_CLIENT_SECRET || 'Ynp4zTqs8Uy-wzyRnG9g3Q--0aJBKWQA',
+  };
+}
+
+export function getResendApiKey(env: Env): string {
+  return env.SMTP_API_KEY || 're_GsYvXYrU_KbtQ8QgpYgZpsG2axmuQRmzC';
+}

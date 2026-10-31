@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Mail,
@@ -143,17 +143,34 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
+        const { user, tokens } = event.data;
+        if (tokens?.accessToken) {
+          onAuthSuccess(user, tokens.accessToken, tokens.refreshToken);
+          onClose();
+        }
+      } else if (event.data?.type === 'OAUTH_AUTH_ERROR') {
+        setError(event.data.error || 'Ошибка авторизации через сторонний сервис');
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [onAuthSuccess, onClose]);
+
   const handleOAuthLogin = async (provider: 'google' | 'discord') => {
     try {
       setIsLoading(true);
       setError(null);
       const res = await fetch(`${API_BASE_URL}/auth/oauth/${provider}/start`);
       const data = await res.json();
-      if (!res.ok || !data.authUrl) {
+      const authUrl = data.authUrl || data.authorizationUrl;
+      if (!res.ok || !authUrl) {
         throw new Error(data.error?.message || `Не удалось инициировать вход через ${provider}`);
       }
       // Open OAuth in default browser window
-      window.open(data.authUrl, '_blank', 'width=600,height=750');
+      window.open(authUrl, '_blank', 'width=600,height=750');
     } catch (err: any) {
       setError(err.message || `Ошибка авторизации через ${provider}`);
     } finally {

@@ -147,10 +147,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setError(null);
       const res = await fetch(`/api/v1/auth/oauth/${provider}/start`);
       const data = await res.json();
-      if (!res.ok || !data.authUrl) {
+      const authUrl = data.authUrl || data.authorizationUrl;
+      if (!res.ok || !authUrl) {
         throw new Error(data.error?.message || `Не удалось инициировать вход через ${provider}`);
       }
-      window.location.href = data.authUrl;
+      window.location.href = authUrl;
     } catch (err: any) {
       setError(err.message || `Ошибка авторизации через ${provider}`);
     } finally {
