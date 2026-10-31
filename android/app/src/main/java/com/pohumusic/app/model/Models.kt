@@ -55,6 +55,9 @@ data class Track(
             val url = artworkUrl ?: return null
             return if (url.startsWith("http")) url else "https://pohumusic-backend.4g-2551.workers.dev${if (url.startsWith("/")) "" else "/"}$url"
         }
+
+    val effectiveUrl: String
+        get() = externalUrl ?: permalinkUrl ?: ""
 }
 
 data class PlaybackInfo(

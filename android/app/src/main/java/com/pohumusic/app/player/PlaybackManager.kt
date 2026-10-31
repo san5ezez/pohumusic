@@ -2,6 +2,7 @@ package com.pohumusic.app.player
 
 import android.content.Context
 import android.media.audiofx.Equalizer
+import android.net.Uri
 import android.os.CountDownTimer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -98,9 +99,10 @@ class PlaybackManager(private val context: Context) {
         }
 
         // Configure MediaItem for audio playback
+        val mediaUri = Uri.parse(track.effectiveUrl)
         val mediaItem = MediaItem.Builder()
             .setMediaId(track.id)
-            .setUri(track.effectiveUrl)
+            .setUri(mediaUri)
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(track.displayTitle)
