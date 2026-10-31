@@ -6,11 +6,11 @@ import { DesktopFullScreenPlayer } from './components/DesktopFullScreenPlayer';
 import { HotkeyConfigModal } from './components/HotkeyConfigModal';
 import { SplashScreen } from './components/SplashScreen';
 import { AuthModal } from './components/AuthModal';
+import { TrackArtwork } from './components/TrackArtwork';
 import { API_BASE_URL } from './config/api';
 import type { Track, HotkeyConfig, Playlist, User } from './types';
 import {
   Play,
-  Music,
   WifiOff,
   Search as SearchIcon,
   Plus,
@@ -496,18 +496,8 @@ export function App() {
                           : 'bg-slate-900/40 hover:bg-slate-900/80 border-slate-800/60'
                       }`}
                     >
-                      <div className="relative aspect-square rounded-lg overflow-hidden bg-slate-950 mb-3">
-                        {t.artworkUrl ? (
-                          <img
-                            src={t.artworkUrl}
-                            alt={t.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-700 text-3xl font-black">
-                            P
-                          </div>
-                        )}
+                      <div className="relative aspect-square rounded-lg overflow-hidden bg-slate-950 mb-3 group-hover:scale-[1.02] transition-transform duration-300">
+                        <TrackArtwork artworkUrl={t.artworkUrl} title={t.title} />
                         <button
                           type="button"
                           className="absolute bottom-2 right-2 p-2.5 rounded-full bg-blue-600 text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
@@ -578,15 +568,11 @@ export function App() {
                     >
                       <div className="flex items-center gap-3 truncate">
                         <div className="w-10 h-10 rounded-lg bg-slate-950 overflow-hidden shrink-0 flex items-center justify-center">
-                          {t.artworkUrl ? (
-                            <img
-                              src={t.artworkUrl}
-                              alt=""
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <Music className="w-5 h-5 text-slate-600" />
-                          )}
+                          <TrackArtwork
+                            artworkUrl={t.artworkUrl}
+                            title={t.title}
+                            size="sm"
+                          />
                         </div>
                         <div className="truncate">
                           <div className={`text-xs font-semibold truncate ${isCurrent ? 'text-blue-400' : 'text-white'}`}>

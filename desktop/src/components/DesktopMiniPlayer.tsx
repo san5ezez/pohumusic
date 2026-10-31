@@ -12,6 +12,7 @@ import {
   Heart,
 } from 'lucide-react';
 import type { Track } from '../types';
+import { TrackArtwork } from './TrackArtwork';
 
 interface DesktopMiniPlayerProps {
   currentTrack: Track | null;
@@ -72,11 +73,13 @@ export const DesktopMiniPlayer: React.FC<DesktopMiniPlayerProps> = ({
       <div className="flex items-center gap-3 w-72 shrink-0">
         {currentTrack ? (
           <>
-            <img
-              src={currentTrack.artworkUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100'}
-              alt={currentTrack.title}
-              className="w-12 h-12 rounded-lg object-cover bg-slate-800 shrink-0"
-            />
+            <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-800 shrink-0">
+              <TrackArtwork
+                artworkUrl={currentTrack.artworkUrl}
+                title={currentTrack.title}
+                size="sm"
+              />
+            </div>
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold text-slate-100 truncate">
                 {currentTrack.title}

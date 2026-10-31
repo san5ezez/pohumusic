@@ -42,6 +42,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
+        const { user, tokens } = event.data;
+        if (tokens?.accessToken) {
+          onAuthSuccess(user, tokens.accessToken, tokens.refreshToken);
+          onClose();
+        }
+      } else if (event.data?.type === 'OAUTH_AUTH_ERROR') {
+        setError(event.data.error || 'Ошибка авторизации через сторонний сервис');
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [onAuthSuccess, onClose]);
+
   if (!isOpen) return null;
 
   const resetForm = () => {
@@ -142,22 +158,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        const { user, tokens } = event.data;
-        if (tokens?.accessToken) {
-          onAuthSuccess(user, tokens.accessToken, tokens.refreshToken);
-          onClose();
-        }
-      } else if (event.data?.type === 'OAUTH_AUTH_ERROR') {
-        setError(event.data.error || 'Ошибка авторизации через сторонний сервис');
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [onAuthSuccess, onClose]);
 
   const handleOAuthLogin = async (provider: 'google' | 'discord') => {
     try {

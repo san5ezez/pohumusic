@@ -11,6 +11,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { Track } from '../types';
+import { TrackArtwork } from './TrackArtwork';
 
 interface DesktopFullScreenPlayerProps {
   track: Track;
@@ -84,11 +85,13 @@ export const DesktopFullScreenPlayer: React.FC<DesktopFullScreenPlayerProps> = (
 
       {/* Center Artwork & Track Details */}
       <div className="flex flex-col items-center justify-center gap-6 my-auto max-w-xl mx-auto text-center">
-        <img
-          src={track.artworkUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600'}
-          alt={track.title}
-          className="w-80 h-80 rounded-2xl object-cover shadow-2xl shadow-black/80 border border-slate-800"
-        />
+        <div className="w-80 h-80 rounded-2xl overflow-hidden shadow-2xl shadow-black/80 border border-slate-800">
+          <TrackArtwork
+            artworkUrl={track.artworkUrl}
+            title={track.title}
+            size="lg"
+          />
+        </div>
 
         <div className="space-y-1 w-full">
           <h2 className="text-2xl font-bold text-white truncate">{track.title}</h2>
