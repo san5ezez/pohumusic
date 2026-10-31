@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">PohuMusic</string>
+    <string name="tab_home">Главная</string>
+    <string name="tab_search">Поиск</string>
+    <string name="tab_library">Моя музыка</string>
+    <string name="tab_profile">Профиль</string>
+</resources>

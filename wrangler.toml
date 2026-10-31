@@ -1,0 +1,36 @@
+name = "pohumusic-backend"
+main = "workers/src/index.ts"
+compatibility_date = "2025-02-14"
+compatibility_flags = ["nodejs_compat"]
+
+# Workers Static Assets for serving the frontend SPA from the same Worker
+# Note: Cloudflare R2 is strictly prohibited and not used anywhere.
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# Cloudflare D1 Database — Single Source of Truth for all user and platform state
+[[d1_databases]]
+binding = "DB"
+database_name = "pohumusic-db"
+database_id = "00000000-0000-0000-0000-000000000001"
+migrations_dir = "workers/src/db/migrations"
+
+# Cloudflare KV Namespace — Provider response cache, rate limits, and OAuth state
+[[kv_namespaces]]
+binding = "KV"
+id = "pohumusic_kv_namespace_id"
+preview_id = "pohumusic_kv_preview_id"
+
+[vars]
+ENVIRONMENT = "production"
+APP_URL = "https://pohumusic.workers.dev"
+ALLOWED_ORIGINS = "https://pohumusic.workers.dev,http://localhost:3000"
+SOUNDCLOUD_API_BASE_URL = "https://api.soundcloud.com"
+SOUNDCLOUD_TOKEN_URL = "https://secure.soundcloud.com/oauth/token"
+YOUTUBE_DAILY_QUOTA_LIMIT = "10000"
+
+[observability]
+enabled = true
+head_sampling_rate = 1
