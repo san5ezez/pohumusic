@@ -55,10 +55,14 @@ export const DesktopMiniPlayer: React.FC<DesktopMiniPlayerProps> = ({
   onToggleFavorite,
   onOpenFullScreen,
 }) => {
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [dragValue, setDragValue] = React.useState(0);
+
   const totalDuration =
     durationMs > 0 ? durationMs : (currentTrack?.durationSeconds || 180) * 1000;
 
-  const currentSec = Math.floor(positionMs / 1000);
+  const activePosition = isDragging ? dragValue : positionMs;
+  const currentSec = Math.floor(activePosition / 1000);
   const totalSec = Math.floor(totalDuration / 1000);
 
   const formatTime = (secs: number) => {
@@ -169,9 +173,29 @@ export const DesktopMiniPlayer: React.FC<DesktopMiniPlayerProps> = ({
             type="range"
             min={0}
             max={totalDuration}
-            value={positionMs}
-            onChange={(e) => onSeek(Number(e.target.value))}
-            className="flex-1 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            value={activePosition}
+            onMouseDown={() => {
+              setIsDragging(true);
+              setDragValue(positionMs);
+            }}
+            onTouchStart={() => {
+              setIsDragging(true);
+              setDragValue(positionMs);
+            }}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              setDragValue(val);
+            }}
+            onMouseUp={(e) => {
+              setIsDragging(false);
+              onSeek(Number((e.target as HTMLInputElement).value));
+            }}
+            onTouchEnd={() => {
+              setIsDragging(false);
+              onSeek(dragValue);
+            }}
+            className="flex-1 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+            style={{ accentColor }}
           />
           <span>{formatTime(totalSec)}</span>
         </div>

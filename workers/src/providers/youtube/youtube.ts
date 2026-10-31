@@ -344,6 +344,15 @@ export class YouTubeClient {
   }
 
   private async searchYouTubeWeb(query: string, limit: number): Promise<Track[]> {
+    // Only search for music/audio content and filter out non-music videos
+    const nonMusicRegex =
+      /\b(подкаст|прохождение|геймплей|gameplay|walkthrough|серия|эпизод|обзор|реакция|vlog|влог|стрим|stream|trailer|тизер|фильм|сериал|shorts|tiktok|шок|пранк)\b/i;
+
+    const musicSearchQuery =
+      /\b(song|music|audio|track|remix|музыка|песня|трек|клип|альбом)\b/i.test(query)
+        ? query
+        : `${query} music audio`;
+
     const res = await this.customFetch('https://www.youtube.com/youtubei/v1/search', {
       method: 'POST',
       headers: {
@@ -360,7 +369,7 @@ export class YouTubeClient {
             gl: 'RU',
           },
         },
-        query,
+        query: musicSearchQuery,
       }),
     });
 
@@ -375,8 +384,6 @@ export class YouTubeClient {
       const v = item.videoRenderer;
       if (!v || !v.videoId) continue;
 
-      const title = v.title?.runs?.[0]?.text || 'Track';
-      const artist = v.ownerText?.runs?.[0]?.text || 'YouTube Music';
       const durationText = v.lengthText?.simpleText || '3:30';
       const parts = durationText.split(':').map(Number);
       const durationSeconds =
@@ -385,6 +392,15 @@ export class YouTubeClient {
           : parts.length === 3
           ? parts[0] * 3600 + parts[1] * 60 + parts[2]
           : 210;
+
+      // Filter: Keep only actual music tracks (between 40 seconds and 12 minutes)
+      if (durationSeconds < 40 || durationSeconds > 720) continue;
+
+      const title = v.title?.runs?.[0]?.text || 'Track';
+      const artist = v.ownerText?.runs?.[0]?.text || 'YouTube Music';
+
+      // Discard non-music gameplay/vlogs/podcasts
+      if (nonMusicRegex.test(title) || nonMusicRegex.test(artist)) continue;
 
       const thumb =
         v.thumbnail?.thumbnails?.[v.thumbnail.thumbnails.length - 1]?.url ||

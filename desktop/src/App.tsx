@@ -105,16 +105,18 @@ export function App() {
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [positionMs, setPositionMs] = useState(0);
+  const [seekPositionMs, setSeekPositionMs] = useState<number | null>(null);
   const [volume, setVolume] = useState(0.8);
   const [isShuffle, setIsShuffle] = useState(false);
   const [isRepeat, setIsRepeat] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
-  // Library state
+  // Library & Search state
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [platformFilter, setPlatformFilter] = useState<'all' | 'soundcloud' | 'youtube'>('all');
 
   // Моя Волна (My Wave) state
   const [waveActivity, setWaveActivity] = useState('working');
@@ -291,7 +293,7 @@ export function App() {
       try {
         setIsSearching(true);
         const res = await fetch(
-          `${API_BASE_URL}/tracks/search?q=${encodeURIComponent(trimmed)}&limit=50`
+          `${API_BASE_URL}/tracks/search?q=${encodeURIComponent(trimmed)}&provider=${platformFilter}&limit=50`
         );
         if (res.ok) {
           const data = await res.json();
@@ -306,7 +308,7 @@ export function App() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, platformFilter]);
 
   // In-focus hotkey listeners (Only active when window has focus)
   useEffect(() => {
@@ -344,12 +346,18 @@ export function App() {
   const currentQueue =
     activeTab === 'search' && searchResults.length > 0 ? searchResults : tracks;
 
+  const handleSeek = (newPos: number) => {
+    setPositionMs(newPos);
+    setSeekPositionMs(newPos);
+  };
+
   const handleNext = () => {
     if (!currentTrack || currentQueue.length === 0) return;
     const idx = currentQueue.findIndex((t) => t.id === currentTrack.id);
     if (idx !== -1 && idx + 1 < currentQueue.length) {
       setCurrentTrack(currentQueue[idx + 1]);
       setPositionMs(0);
+      setSeekPositionMs(null);
       setIsPlaying(true);
     }
   };
@@ -360,6 +368,7 @@ export function App() {
     if (idx > 0) {
       setCurrentTrack(currentQueue[idx - 1]);
       setPositionMs(0);
+      setSeekPositionMs(null);
       setIsPlaying(true);
     }
   };
@@ -775,24 +784,51 @@ export function App() {
                 </p>
               </div>
 
-              <div className="relative">
-                <SearchIcon className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Исполнитель, трек или альбом..."
-                  className="w-full pl-10 pr-10 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                />
-                {isSearching && (
-                  <div className="absolute right-3.5 top-3">
-                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                  </div>
-                )}
+              <div className="space-y-3">
+                <div className="relative">
+                  <SearchIcon className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Исполнитель, трек или альбом..."
+                    className="w-full pl-10 pr-10 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  />
+                  {isSearching && (
+                    <div className="absolute right-3.5 top-3">
+                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Platform Filter Chips */}
+                <div className="flex items-center gap-2">
+                  {[
+                    { id: 'all', label: 'Все платформы' },
+                    { id: 'soundcloud', label: 'SoundCloud' },
+                    { id: 'youtube', label: 'YouTube Music' },
+                  ].map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setPlatformFilter(p.id as any)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                        platformFilter === p.id
+                          ? 'text-white shadow-md'
+                          : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+                      }`}
+                      style={platformFilter === p.id ? { backgroundColor: accentColor } : {}}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-2">
-                {searchList.map((t) => {
+                {searchList
+                  .filter((t) => (platformFilter === 'all' ? true : t.provider === platformFilter))
+                  .map((t) => {
                   const isCurrent = currentTrack?.id === t.id;
                   const durSec = t.durationSeconds || Math.round((t.durationMs || 0) / 1000) || 0;
                   return (
@@ -1110,7 +1146,7 @@ export function App() {
         onPlayPause={() => setIsPlaying((p) => !p)}
         onNext={handleNext}
         onPrev={handlePrev}
-        onSeek={setPositionMs}
+        onSeek={handleSeek}
         onVolumeChange={setVolume}
         onToggleShuffle={() => setIsShuffle((s) => !s)}
         onToggleRepeat={() => setIsRepeat((r) => !r)}
@@ -1124,6 +1160,7 @@ export function App() {
         isPlaying={isPlaying}
         volume={volume}
         positionMs={positionMs}
+        seekPositionMs={seekPositionMs}
         onPositionUpdate={setPositionMs}
         onTrackEnded={handleNext}
       />
@@ -1142,7 +1179,7 @@ export function App() {
           onPlayPause={() => setIsPlaying((p) => !p)}
           onNext={handleNext}
           onPrev={handlePrev}
-          onSeek={setPositionMs}
+          onSeek={handleSeek}
           onToggleShuffle={() => setIsShuffle((s) => !s)}
           onToggleRepeat={() => setIsRepeat((r) => !r)}
           onToggleFavorite={() => toggleFavorite(currentTrack.id)}
