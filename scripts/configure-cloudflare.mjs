@@ -134,7 +134,7 @@ async function main() {
   // 3. Apply D1 Migrations
   console.log('⚡ Applying D1 migrations to remote database...');
   try {
-    const migOut = run('npx wrangler d1 migrations apply pohumusic-db --remote');
+    const migOut = run('npx wrangler d1 migrations apply pohumusic-db --remote --yes', true);
     console.log(migOut);
   } catch (migErr) {
     console.warn('Warning during migrations:', migErr.message);
